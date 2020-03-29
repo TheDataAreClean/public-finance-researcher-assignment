@@ -44,10 +44,10 @@ Final Findings [Presentation](https://docs.google.com/presentation/d/17HV_MKCJfz
 ### **Contents**
 
 1. [CivicDataLab | Public Finance Researcher Assignment](https://docs.google.com/presentation/d/17HV_MKCJfzeP8RKrPK-cFHwmTtSsxULCD_j7Dz21WrU/edit?usp=sharing) - Final findings presentation.
-2. Data Analysis Blog
-3. Data Analysis Report
-4. Exploratory Analysis Report
-5. Data Health Report
+2. [Data Analysis Blog](https://github.com/TheDataAreClean/public-finance-researcher-assignment/blob/master/files/html/data_analysis_blog.html) - Final Analysis Report (w/o code)
+3. [Data Analysis Report](https://github.com/TheDataAreClean/public-finance-researcher-assignment/blob/master/files/html/data_analysis_report.html) - Final Analysis Report (w/ code)
+4. [Exploratory Analysis Report](https://github.com/TheDataAreClean/public-finance-researcher-assignment/blob/master/files/html/exploratory_analysis_report.html) - Exploratory Process and Analysis
+5. [Data Health Report](https://github.com/TheDataAreClean/public-finance-researcher-assignment/blob/master/files/html/data_analysis_report.html)
 
 ### **Structure**
 
@@ -55,6 +55,6 @@ Final Findings [Presentation](https://docs.google.com/presentation/d/17HV_MKCJfz
 root
 └── README.md
 └── files
-    └── rmd
-    └── html
+    └── rmd (All the R Markdown files for the analysis)
+    └── html (All the rendered HTML files for the analysis)
 ```
