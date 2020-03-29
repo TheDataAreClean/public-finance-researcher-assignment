@@ -1,0 +1,169 @@
+---
+title: "**Data Health Report**"
+author: "TheDataAreClean"
+date: "23rd March, '20"
+output: 
+  html_document: 
+    highlight: tango
+    theme: yeti
+    toc: yes
+    toc_depth: 6
+---
+
+### **Objective**
+
+Analysing the health and integrity of the data files recieved or the Public Finance Researcher position at CivicDataLab.
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(message = FALSE)
+
+# Load packages
+library(tidyverse)
+library(readxl)
+library(formattable)
+```
+
+### **Datasets**
+
+As a part of the assignment, 4 data files in `.csv` format were provided were provided and 2 metadata files in `.xlsx` format with descriptions of the data file fields.
+
+```{r data}
+# Data files for the assignment
+dir("../data/raw/")
+
+# Metadata files for the assignment
+dir("../data/metadata/")
+```
+
+#### **Read**
+
+Read the individual state expenditure and district spending data files into the enviroment for analysis.
+
+```{r read, cache = TRUE}
+# Read the 2018-19 & 2017-18 state wise budget data
+budget_exp_2018_19 <- read_csv("../data/raw/budget_expenditure_fy_2018_19.csv")
+budget_exp_2017_18 <- read_csv("../data/raw/budget_expenditure_fy_2017_18.csv")
+
+# Read the 2018-19 & 2017-18 district wise spending data
+district_spending_exp_2018_19 <- read_csv("../data/raw/district_spending_expenditure_fy_2018_19.csv")
+district_spending_exp_2017_18 <- read_csv("../data/raw/district_spending_expenditure_fy_2017_18.csv")
+```
+
+The metadata descriptions for the files.
+
+```{r metadata}
+## State Expenditure
+# Read the metadata
+state_expenditure_metadata <- read_excel("../data/metadata/Metadata Himachal Budget Allocation.xlsx")
+
+# Review the fields
+state_expenditure_metadata
+
+## District Spending
+# Read the metadata
+district_spending_metadata <- read_excel("../data/metadata/Metadata Himachal Spending Expendiure.xlsx")
+
+# Review the fields
+district_spending_metadata
+```
+
+#### **Review**
+
+Review the composition of individual state expenditure and district spending datasets.
+
+```{r review, cache = TRUE}
+glimpse(budget_exp_2018_19)
+glimpse(budget_exp_2017_18)
+glimpse(district_spending_exp_2018_19)
+glimpse(district_spending_exp_2017_18)
+```
+
+#### **Clean**
+
+Clean & normalize the dataset using learnings from the metadata & review to prepare the final datasets for analysis.
+
+```{r clean, cache = TRUE}
+## State expenditure data
+# Add the year field signifier
+budget_exp_2018_19$year <- "2018-19"
+budget_exp_2017_18$year <- "2017-18"
+
+# Append the 2 financial year datasets as for analysis
+budget_exp_final <- bind_rows(budget_exp_2018_19, budget_exp_2017_18)
+
+# Rename the fields
+names(budget_exp_final)[14:20] <- c("soe", "soe_description", "transaction_date", "sanction", "addition", "savings", "revised")
+
+# Normalize text description fields
+budget_exp_final$demand_desc <- toupper(trimws(budget_exp_final$demand_desc))
+budget_exp_final$major_desc <- toupper(trimws(budget_exp_final$major_desc))
+budget_exp_final$sub_major_desc <- toupper(trimws(budget_exp_final$sub_major_desc))
+budget_exp_final$minor_desc <- toupper(trimws(budget_exp_final$minor_desc))
+budget_exp_final$sub_minor_desc <- toupper(trimws(budget_exp_final$sub_minor_desc))
+
+## District spending data
+# Add the year field signifier
+district_spending_exp_2018_19$year <- "2018-19"
+district_spending_exp_2017_18$year <- "2017-18"
+
+# Append the 2 financial year datasets as for analysis
+district_spending_exp_final <- bind_rows(district_spending_exp_2018_19, district_spending_exp_2017_18)
+
+# Rename the fields
+names(district_spending_exp_final)[1:5] <- c("district", "treasury_code", "treasury", "ddo_code", "ddo_desc")
+names(district_spending_exp_final)[19:27] <- c("soe", "soe_description", "transaction_date", "voucher", "bills", "gross", "agded", "btded", "net_payment")
+
+# Normalize text description fields
+district_spending_exp_final$ddo_desc <- toupper(trimws(district_spending_exp_final$ddo_desc))
+district_spending_exp_final$demand_desc <- toupper(trimws(district_spending_exp_final$demand_desc))
+district_spending_exp_final$major_desc <- toupper(trimws(district_spending_exp_final$major_desc))
+district_spending_exp_final$sub_major_desc <- toupper(trimws(district_spending_exp_final$sub_major_desc))
+district_spending_exp_final$minor_desc <- toupper(trimws(district_spending_exp_final$minor_desc))
+district_spending_exp_final$sub_minor_desc <- toupper(trimws(district_spending_exp_final$sub_minor_desc))
+```
+
+### **Findings**
+
+#### **Data**
+
+* Granular transactional level state expenditure and district spending information.
+* Information avialble at Account Heads and Statement of Expenditure granularity.
+* Details available on Voted / Charged and Plan / Non-Plan expenditure
+* Monetary information available broken down by sactioned, added and saved amount.
+* Text description fields normalized for consumption throughout the analysis.
+
+#### **Ideas**
+
+**_Overall Analysis_**
+
+* YoY analysis of monetary trends; sactions, additions, savings, revisions.
+* Sector wise analysis of finds deployed and trends observed.
+* Gap identification in the expendiure vs spendings datasets.
+* Unavailable information across files for stated expenditure.
+
+**_Sector Analysis_**
+
+* Education sector analysis on funds availability and dissemination.
+* Trends of spending over time and by usage of funds.
+* Geography level analysis over where the funds are being disseminated.
+
+#### **Next Steps**
+
+Export cleaned datasets for further analysis of funds basis the ideas stated above.
+
+```{r export, eval = FALSE}
+# State expenditure combined & cleaned dataset
+write_csv(budget_exp_final, "../data/processed/budget_exp_final.csv")
+
+# District expenditure combined & cleaned dataset
+write_csv(district_spending_exp_final, "../data/processed/district_spending_exp_final.csv")
+```
+
+### **Session Info**
+
+```{r}
+# Information about the machine and enviroment
+sessionInfo()
+```
+

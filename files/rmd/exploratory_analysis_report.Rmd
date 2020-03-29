@@ -1,0 +1,756 @@
+---
+title: "**Exploratory Analysis Report**"
+author: "TheDataAreClean"
+date: "25th March, '20"
+output: 
+  html_document: 
+    highlight: tango
+    theme: yeti
+    toc: yes
+    toc_depth: 6
+---
+
+### **Objective**
+
+Exploratory analysis of the data to unsterstand the composition and trends of the budget expenditure and district spending data.
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(message = FALSE)
+
+# Load packages
+library(tidyverse)
+library(formattable)
+library(lubridate)
+```
+
+### **Read**
+
+Read the combined and cleaned state expenditure and district spending datasets for exploratory analysis.
+
+```{r read, cache = TRUE}
+# State expenditure data
+budget_exp_final <- read_csv("../data/processed/budget_exp_final.csv")
+
+# Distirct spending data
+district_spending_exp_final <- read_csv("../data/processed/district_spending_exp_final.csv")
+```
+
+### **Analysis**
+
+#### **State Budget Expenditure**
+
+##### **Overall**
+
+```{r overall}
+# Quick Summary
+budget_exp_final %>%
+    group_by(year) %>%
+    summarise(sanction = sum(sanction),
+              addition = sum(addition),
+              savings = sum(savings),
+              revised = sum(revised))
+```
+
+* The sanctioned budget amount for Himachal Pradesh in 2018-19 was 159.7 Cr., a 14.5% increase over the previous years budget. 
+* Post revisions, the allocated amount went down to 97.2% of the sanctions allocated in the year 2017-18, and 95% in the year 2018-19.
+
+##### **Top Major Account Heads**
+
+```{r account-heads}
+# Account Head Wise spending
+budget_exp_final %>%
+    group_by(year, demand_desc) %>%
+    summarise(sanction = sum(sanction)) %>%
+    spread(year, sanction, fill = 0) %>%
+    arrange(desc(`2018-19`)) %>%
+    mutate(`Total Sanction (2018-19)` = sum(`2018-19`),
+           `Total Sanction (2017-18)` = sum(`2017-18`)) %>%
+    mutate(`% of Expenditure (2018-19)` = percent(`2018-19`/`Total Sanction (2018-19)`),
+           `% of Expenditure (2017-18)` = percent(`2017-18`/`Total Sanction (2017-18)`)) %>%
+    select(demand_desc, `2018-19`, `% of Expenditure (2018-19)`, `2017-18`, `% of Expenditure (2017-18)`)
+```
+
+* Finance was alloyed the highest amount of all account heads, 30.49% of total sanctioned expenditure for the year; followed by Education with 14.12% & Public Works – Roads Bridges & Buildings at 10.26%
+* This trend has followed form 2017-18 in terms of priority for the state budget allocations.
+
+##### **Allocations Over Time**
+
+```{r over-time}
+# Trends for budget allocation over time
+budget_exp_final %>%
+    mutate(month = floor_date(transaction_date, unit = "month")) %>%
+    group_by(month) %>%
+    summarise(sanction = sum(sanction),
+              revised = sum(revised)) %>%
+    gather(type, amount, -month) %>%
+    ggplot(aes(x = month, y = amount, color = type)) +
+    geom_line() + geom_point()
+```
+
+* Looking at the time trends data, the impression recieved is that budgets and revisions are done with the intent to distribute the aloocations at a dataily basis on the projected price.
+* It will be interesting to compare it against the spending data to see the spending trends on ground.
+
+##### **Voted/Charged & Plan/Non-Plan**
+
+```{r voted-charged-plan, warning = FALSE}
+# Voted/Charged
+budget_exp_final %>%
+    group_by(year, voted_charged) %>%
+    summarise(sanction = sum(sanction)) %>%
+    spread(voted_charged, sanction) %>%
+    mutate(percent_charged = percent(C/(V+C)),
+           percent_voted = percent(V/(V+C)))
+
+# Plan/Non-Plan
+budget_exp_final %>%
+    group_by(year, plan_nonplan) %>%
+    summarise(sanction = sum(sanction)) %>%
+    spread(plan_nonplan, sanction) %>%
+    mutate(percent_non_plan = percent(N/(N+P)),
+           percent_plan = percent(P/(N+P)))
+```
+
+* ~83% of all budgetary allocation in Himachal Pradesh in Voted, remaining ~17% charged.
+* ~78% of all budgetary allocation is non-plan expense, and remaning ~22% planned.
+
+##### **2018-19 vs 2017-18**
+
+```{r account-heads-exp}
+# Overall Top 10 Investments
+# Absolute change in account heads expenditure
+budget_exp_final %>%
+    group_by(year, demand_desc) %>%
+    summarise(sanction = sum(sanction)) %>%
+    spread(year, sanction, fill = 0) %>%
+    mutate(delta = `2018-19` - `2017-18`,
+          percent_delta = percent((`2018-19` - `2017-18`)/`2017-18`)) %>%
+    arrange(desc(delta))
+
+# % change in account heads expenditure
+budget_exp_final %>%
+    group_by(year, demand_desc) %>%
+    summarise(sanction = sum(sanction)) %>%
+    spread(year, sanction, fill = 0) %>%
+    mutate(delta = `2018-19` - `2017-18`,
+          percent_delta = percent((`2018-19` - `2017-18`)/`2017-18`)) %>%
+    arrange(desc(percent_delta))
+
+# Overall Top 10 Disinvestments
+# Absolute change in account heads expenditure
+budget_exp_final %>%
+    group_by(year, demand_desc) %>%
+    summarise(sanction = sum(sanction)) %>%
+    spread(year, sanction, fill = 0) %>%
+    mutate(delta = `2018-19` - `2017-18`,
+          percent_delta = percent((`2018-19` - `2017-18`)/`2017-18`)) %>%
+    arrange(delta)
+
+# Absolute change in account heads expenditure
+budget_exp_final %>%
+    group_by(year, demand_desc) %>%
+    summarise(sanction = sum(sanction)) %>%
+    spread(year, sanction, fill = 0) %>%
+    mutate(delta = `2018-19` - `2017-18`,
+          percent_delta = percent((`2018-19` - `2017-18`)/`2017-18`)) %>%
+    arrange(percent_delta)
+```
+
+* Finance, Education & Public Works has seen the most increase in absolute sanctions numbers in 2018-19 over 2017-18.
+* Tourism and Civil Aviation (61.84%), Industries Mineral Supplies and Information Technology (52.77%) and Agriculture (34.04%) have seen highest sanctions in terms of % change.
+* Labour Employemnt and Training, Election, Governor of Council and Ministries has seen the most decrease in absolute sanctions numbers in 2018-19 over 2017-18.
+* Election (37.58%), Labour Employemnt and Training (23.19%) have seen highest descrease sanctions in terms of % change.
+
+##### **Estimates vs Revisions**
+
+```{r revised-exp}
+## Estimates to Revision
+## 2017-18 positive absolute change
+budget_exp_final %>%
+    filter(year == "2017-18") %>%
+    group_by(demand_desc) %>%
+    summarise(sanction = sum(sanction),
+              revised = sum(revised)) %>%
+    mutate(revision_delta = (revised - sanction),
+           percent_delta =  percent((revised - sanction)/sanction)) %>%
+    arrange(desc(revision_delta))
+    
+## 2017-18 positive percent change
+budget_exp_final %>%
+    filter(year == "2017-18") %>%
+    group_by(demand_desc) %>%
+    summarise(sanction = sum(sanction),
+              revised = sum(revised)) %>%
+    mutate(revision_delta = (revised - sanction),
+           percent_delta =  percent((revised - sanction)/sanction)) %>%
+    arrange(desc(percent_delta))
+
+## 2017-18 negative absolute change
+budget_exp_final %>%
+    filter(year == "2017-18") %>%
+    group_by(demand_desc) %>%
+    summarise(sanction = sum(sanction),
+              revised = sum(revised)) %>%
+    mutate(revision_delta = (revised - sanction),
+           percent_delta =  percent((revised - sanction)/sanction)) %>%
+    arrange(revision_delta)
+    
+## 2017-18 negative percent change
+budget_exp_final %>%
+    filter(year == "2017-18") %>%
+    group_by(demand_desc) %>%
+    summarise(sanction = sum(sanction),
+              revised = sum(revised)) %>%
+    mutate(revision_delta = (revised - sanction),
+           percent_delta =  percent((revised - sanction)/sanction)) %>%
+    arrange(percent_delta)
+
+## 2018-19 positive absolute change
+budget_exp_final %>%
+    filter(year == "2018-19") %>%
+    group_by(demand_desc) %>%
+    summarise(sanction = sum(sanction),
+              revised = sum(revised)) %>%
+    mutate(revision_delta = (revised - sanction),
+           percent_delta =  percent((revised - sanction)/sanction)) %>%
+    arrange(desc(revision_delta))
+    
+## 2018-19 positive percent change
+budget_exp_final %>%
+    filter(year == "2018-19") %>%
+    group_by(demand_desc) %>%
+    summarise(sanction = sum(sanction),
+              revised = sum(revised)) %>%
+    mutate(revision_delta = (revised - sanction),
+           percent_delta =  percent((revised - sanction)/sanction)) %>%
+    arrange(desc(percent_delta))
+
+## 2018-19 negative absolute change
+budget_exp_final %>%
+    filter(year == "2018-19") %>%
+    group_by(demand_desc) %>%
+    summarise(sanction = sum(sanction),
+              revised = sum(revised)) %>%
+    mutate(revision_delta = (revised - sanction),
+           percent_delta =  percent((revised - sanction)/sanction)) %>%
+    arrange(revision_delta)
+    
+## 2018-19 negative percent change
+budget_exp_final %>%
+    filter(year == "2018-19") %>%
+    group_by(demand_desc) %>%
+    summarise(sanction = sum(sanction),
+              revised = sum(revised)) %>%
+    mutate(revision_delta = (revised - sanction),
+           percent_delta =  percent((revised - sanction)/sanction)) %>%
+    arrange(percent_delta)
+```
+
+* Irrigation Water Supply and Sanitation & Finance saw one of the highest increase from sanctions to revisons in both 2017-18 & 2018-19.
+* Both financial years saw over huge increases in election expenditure from sanctions to revised, 57.29% in 2017-18 and 74.37% in 2018-19
+* Education, Scheduled Castes Sub Plan, Rural Developement, Tribal Developement saw one of the highest decrease from sanctions to revisons in both 2017-18 & 2018-19.
+
+#### **District Spending**
+
+##### **Overall**
+
+```{r district-overall}
+# Quick Summary
+district_spending_exp_final %>%
+    group_by(year) %>%
+    summarise(gross = sum(gross),
+              adged = sum(agded),
+              btded = sum(btded),
+              net_payment = sum(net_payment))
+```
+
+* The net payments amount for Himachal Pradesh in 2018-19 was 293.6 Bn., a 12.7% increase over the previous years budget. 
+
+##### **Allocations Over Time**
+
+```{r district-over-time}
+# Trends for budget allocation over time
+district_spending_exp_final %>%
+    mutate(month = floor_date(transaction_date, unit = "month")) %>%
+    group_by(month) %>%
+    summarise(gross = sum(gross),
+              net_payment = sum(net_payment)) %>%
+    gather(type, amount, -month) %>%
+    ggplot(aes(x = month, y = amount, color = type)) +
+    geom_line() + geom_point()
+```
+
+* Majority of payments happend during the month of March, a trend that can traced to both years.
+
+##### **Top Districts & Treasuries**
+
+```{r distirct-treasuries}
+# District Wise spending
+district_spending_exp_final %>%
+    group_by(year, district) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    spread(year, net_payment, fill = 0) %>%
+    arrange(desc(`2018-19`)) %>%
+    mutate(`net_payment (2018-19)` = sum(`2018-19`),
+           `net_payment (2017-18)` = sum(`2017-18`)) %>%
+    mutate(`% of net_payment (2018-19)` = percent(`2018-19`/`net_payment (2018-19)`),
+           `% of net_payment (2017-18)` = percent(`2017-18`/`net_payment (2017-18)`)) %>%
+    select(district, `2018-19`, `% of net_payment (2018-19)`, `2017-18`, `% of net_payment (2017-18)`)
+
+# Treasury Wise spending
+district_spending_exp_final %>%
+    group_by(year, treasury) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    spread(year, net_payment, fill = 0) %>%
+    arrange(desc(`2018-19`)) %>%
+    mutate(`net_payment (2018-19)` = sum(`2018-19`),
+           `net_payment (2017-18)` = sum(`2017-18`)) %>%
+    mutate(`% of net_payment (2018-19)` = percent(`2018-19`/`net_payment (2018-19)`),
+           `% of net_payment (2017-18)` = percent(`2017-18`/`net_payment (2017-18)`)) %>%
+    select(treasury, `2018-19`, `% of net_payment (2018-19)`, `2017-18`, `% of net_payment (2017-18)`)
+```
+
+* Shimla Capital Treasury & Shimla Distrcits combined cover 51.34% spending in Himachal Pradesh in 2018-19; and 50.8% in 2017-18
+* Followed by Dharamsala to at 10.78% of total district spending in 2018-19 and 11.25% in 2017-18.
+
+##### **Top Major Account Heads**
+
+```{r district-account-heads}
+# Account Head wise spending
+district_spending_exp_final %>%
+    group_by(year, demand_desc) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    spread(year, net_payment, fill = 0) %>%
+    arrange(desc(`2018-19`)) %>%
+    mutate(`net_payment (2018-19)` = sum(`2018-19`),
+           `net_payment (2017-18)` = sum(`2017-18`)) %>%
+    mutate(`% of net_payment (2018-19)` = percent(`2018-19`/`net_payment (2018-19)`),
+           `% of net_payment (2017-18)` = percent(`2017-18`/`net_payment (2017-18)`)) %>%
+    select(demand_desc, `2018-19`, `% of net_payment (2018-19)`, `2017-18`, `% of net_payment (2017-18)`)
+
+# Demand Description is NA
+district_spending_exp_final %>%
+    filter(is.na(demand_desc)) %>%
+    group_by(year, district) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    spread(year, net_payment, fill = 0) %>%
+    arrange(desc(`2018-19`)) %>%
+    mutate(`net_payment (2018-19)` = sum(`2018-19`),
+           `net_payment (2017-18)` = sum(`2017-18`)) %>%
+    mutate(`% of net_payment (2018-19)` = percent(`2018-19`/`net_payment (2018-19)`),
+           `% of net_payment (2017-18)` = percent(`2017-18`/`net_payment (2017-18)`)) %>%
+    select(district, `2018-19`, `% of net_payment (2018-19)`, `2017-18`, `% of net_payment (2017-18)`)
+```
+
+* Finance (16.04%), Education (11.49%) and Health and Family Welfare have the highest amount of net payments across both financial years.
+* 26.39% of net payments have no demand description against them, when looking at the district data they are spread acros all with Shimla at top with 24.06% of the NA spend and Dharamsala at 14.91%.
+
+##### **Change Over Years**
+
+```{r district-account-heads-change}
+# Abslolute Positive Change in Net Payments
+district_spending_exp_final %>%
+    group_by(year, demand_desc) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    spread(year, net_payment, fill = 0) %>%
+    mutate(delta = `2018-19` - `2017-18`,
+           percent_delta = percent((`2018-19` - `2017-18`)/`2017-18`)) %>%
+    select(demand_desc, `2018-19`, `2017-18`, delta, percent_delta) %>%
+    arrange(desc(delta))
+
+# % Positive Change in Net Payments
+district_spending_exp_final %>%
+    group_by(year, demand_desc) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    spread(year, net_payment, fill = 0) %>%
+    mutate(delta = `2018-19` - `2017-18`,
+           percent_delta = percent((`2018-19` - `2017-18`)/`2017-18`)) %>%
+    select(demand_desc, `2018-19`, `2017-18`, delta, percent_delta) %>%
+    arrange(desc(percent_delta))
+
+# Abslolute Negative Change in Net Payments
+district_spending_exp_final %>%
+    group_by(year, demand_desc) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    spread(year, net_payment, fill = 0) %>%
+    mutate(delta = `2018-19` - `2017-18`,
+           percent_delta = percent((`2018-19` - `2017-18`)/`2017-18`)) %>%
+    select(demand_desc, `2018-19`, `2017-18`, delta, percent_delta) %>%
+    arrange(delta)
+
+# % Negative Change in Net Payments
+district_spending_exp_final %>%
+    group_by(year, demand_desc) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    spread(year, net_payment, fill = 0) %>%
+    mutate(delta = `2018-19` - `2017-18`,
+           percent_delta = percent((`2018-19` - `2017-18`)/`2017-18`)) %>%
+    select(demand_desc, `2018-19`, `2017-18`, delta, percent_delta) %>%
+    arrange(percent_delta)
+```
+
+* Power Development, Land Revenue and District Administration, Rural Development had the highest absokute increase in net payments YoY.
+* Power Development (160.48%), LUrban Development Town and Country Planning and Housing (77.97%) highest % increase in net payments YoY.
+* Planning and Backward Area Sub-Plan had the highest absolute decrease in net payments YoY.
+
+#### **Education Sector Analysis**
+
+##### **State Budget Expenditure**
+
+###### **Overall**
+```{r ed-overall}
+budget_exp_final %>%
+    filter(demand_desc == "EDUCATION") %>%
+    group_by(year) %>%
+    summarise(sanction = sum(sanction),
+              revised = sum(revised))
+```
+
+* In 2017-18, the revised education budget was 95% of originally sanctioned.
+* In 2017-18, the revised education budget was down to 85% of originally sanctioned.
+
+###### **Account Heads**
+
+```{r ed-account-heads}
+# Major Expenditure 
+budget_exp_final %>%
+    filter(demand_desc == "EDUCATION") %>%
+    group_by(year, major_desc) %>%
+    summarise(sanction = sum(sanction)) %>%
+    spread(year, sanction, fill = 0) %>%
+    arrange(desc(`2018-19`)) %>%
+    mutate(`Total Sanction (2018-19)` = sum(`2018-19`),
+           `Total Sanction (2017-18)` = sum(`2017-18`)) %>%
+    mutate(`% of Expenditure (2018-19)` = percent(`2018-19`/`Total Sanction (2018-19)`),
+           `% of Expenditure (2017-18)` = percent(`2017-18`/`Total Sanction (2017-18)`)) %>%
+    select(major_desc, `2018-19`, `% of Expenditure (2018-19)`, `2017-18`, `% of Expenditure (2017-18)`)
+
+# Major Expenditure
+budget_exp_final %>%
+    filter(demand_desc == "EDUCATION" & major_desc == "GENERAL EDUCATION") %>%
+    group_by(year, sub_major_desc) %>%
+    summarise(sanction = sum(sanction)) %>%
+    spread(year, sanction, fill = 0) %>%
+    arrange(desc(`2018-19`)) %>%
+    mutate(`Total Sanction (2018-19)` = sum(`2018-19`),
+           `Total Sanction (2017-18)` = sum(`2017-18`)) %>%
+    mutate(`% of Expenditure (2018-19)` = percent(`2018-19`/`Total Sanction (2018-19)`),
+           `% of Expenditure (2017-18)` = percent(`2017-18`/`Total Sanction (2017-18)`)) %>%
+    select(sub_major_desc, `2018-19`, `% of Expenditure (2018-19)`, `2017-18`, `% of Expenditure (2017-18)`)
+
+# Sub-major Expenditure
+# Elementary Education
+budget_exp_final %>%
+    filter(demand_desc == "EDUCATION" & 
+             major_desc == "GENERAL EDUCATION" &
+             sub_major_desc == "ELEMENTARY EDUCATION") %>%
+    group_by(year, minor_desc) %>%
+    summarise(sanction = sum(sanction)) %>%
+    spread(year, sanction, fill = 0) %>%
+    arrange(desc(`2018-19`)) %>%
+    mutate(`Total Sanction (2018-19)` = sum(`2018-19`),
+           `Total Sanction (2017-18)` = sum(`2017-18`)) %>%
+    mutate(`% of Expenditure (2018-19)` = percent(`2018-19`/`Total Sanction (2018-19)`),
+           `% of Expenditure (2017-18)` = percent(`2017-18`/`Total Sanction (2017-18)`)) %>%
+    select(minor_desc, `2018-19`, `% of Expenditure (2018-19)`, `2017-18`, `% of Expenditure (2017-18)`)
+
+# Secondary Education
+budget_exp_final %>%
+    filter(demand_desc == "EDUCATION" & 
+             major_desc == "GENERAL EDUCATION" &
+             sub_major_desc == "SECONDARY EDUCATION") %>%
+    group_by(year, minor_desc) %>%
+    summarise(sanction = sum(sanction)) %>%
+    spread(year, sanction, fill = 0) %>%
+    arrange(desc(`2018-19`)) %>%
+    mutate(`Total Sanction (2018-19)` = sum(`2018-19`),
+           `Total Sanction (2017-18)` = sum(`2017-18`)) %>%
+    mutate(`% of Expenditure (2018-19)` = percent(`2018-19`/`Total Sanction (2018-19)`),
+           `% of Expenditure (2017-18)` = percent(`2017-18`/`Total Sanction (2017-18)`)) %>%
+    select(minor_desc, `2018-19`, `% of Expenditure (2018-19)`, `2017-18`, `% of Expenditure (2017-18)`)
+
+# Minor Expenditure
+# Elementary Education
+budget_exp_final %>%
+    filter(demand_desc == "EDUCATION" & 
+             major_desc == "GENERAL EDUCATION" &
+             sub_major_desc == "ELEMENTARY EDUCATION" &
+             minor_desc == "GOVERNMENT PRIMARY SCHOOLS") %>%
+    group_by(year, sub_minor_desc) %>%
+    summarise(sanction = sum(sanction)) %>%
+    spread(year, sanction, fill = 0) %>%
+    arrange(desc(`2018-19`)) %>%
+    mutate(`Total Sanction (2018-19)` = sum(`2018-19`),
+           `Total Sanction (2017-18)` = sum(`2017-18`)) %>%
+    mutate(`% of Expenditure (2018-19)` = percent(`2018-19`/`Total Sanction (2018-19)`),
+           `% of Expenditure (2017-18)` = percent(`2017-18`/`Total Sanction (2017-18)`)) %>%
+    select(sub_minor_desc, `2018-19`, `% of Expenditure (2018-19)`, `2017-18`, `% of Expenditure (2017-18)`)
+
+# Secondary Education
+budget_exp_final %>%
+    filter(demand_desc == "EDUCATION" & 
+             major_desc == "GENERAL EDUCATION" &
+             sub_major_desc == "SECONDARY EDUCATION" &
+             minor_desc == "GOVERNMENT SECONDARY SCHOOLS") %>%
+    group_by(year, sub_minor_desc) %>%
+    summarise(sanction = sum(sanction)) %>%
+    spread(year, sanction, fill = 0) %>%
+    arrange(desc(`2018-19`)) %>%
+    mutate(`Total Sanction (2018-19)` = sum(`2018-19`),
+           `Total Sanction (2017-18)` = sum(`2017-18`)) %>%
+    mutate(`% of Expenditure (2018-19)` = percent(`2018-19`/`Total Sanction (2018-19)`),
+           `% of Expenditure (2017-18)` = percent(`2017-18`/`Total Sanction (2017-18)`)) %>%
+    select(sub_minor_desc, `2018-19`, `% of Expenditure (2018-19)`, `2017-18`, `% of Expenditure (2017-18)`)
+```
+
+* ~98% of all state education expenditure was towards General Education account head.
+* The top Sub Majors were Elementary Education (53.76%), Secondary Education (38.54%) & University and Higher Education (7.24%).
+* Under Elementary Education, 85% of the expenditure  was towards Govt. Primary Schools & for Secondary Education, 98% of expenditure was sanctioned towards Govt. Secondary Schools
+
+###### **Statement of Expenditure**
+
+```{r ed-soe}
+# Education Overall
+budget_exp_final %>%
+    filter(demand_desc == "EDUCATION") %>%
+    group_by(year, soe_description) %>%
+    summarise(sanction = sum(sanction)) %>%
+    spread(year, sanction, fill = 0) %>%
+    arrange(desc(`2018-19`)) %>%
+    mutate(`Total Sanction (2018-19)` = sum(`2018-19`),
+           `Total Sanction (2017-18)` = sum(`2017-18`)) %>%
+    mutate(`% of Expenditure (2018-19)` = percent(`2018-19`/`Total Sanction (2018-19)`),
+           `% of Expenditure (2017-18)` = percent(`2017-18`/`Total Sanction (2017-18)`)) %>%
+    select(soe_description, `2018-19`, `% of Expenditure (2018-19)`, `2017-18`, `% of Expenditure (2017-18)`)
+```
+
+* ~82% of all education expenses were towards salaries.
+
+###### **Voted/Charged & Plan/Non-Plan**
+
+```{r ed-voted-charged-plan, warning = FALSE}
+# Voted/Charged
+budget_exp_final %>%
+    filter(demand_desc == "EDUCATION") %>%
+    group_by(year, voted_charged) %>%
+    summarise(sanction = sum(sanction)) %>%
+    spread(voted_charged, sanction) %>%
+    mutate(percent_charged = percent(C/(V+C)),
+           percent_voted = percent(V/(V+C)))
+
+# Plan/Non-Plan
+budget_exp_final %>%
+    filter(demand_desc == "EDUCATION") %>%
+    group_by(year, plan_nonplan) %>%
+    summarise(sanction = sum(sanction)) %>%
+    spread(plan_nonplan, sanction) %>%
+    mutate(percent_non_plan = percent(N/(N+P)),
+           percent_plan = percent(P/(N+P)))
+```
+
+* All the Himachal Pradesh state expenditure towards education was voted for.
+* ~16% of the expenditure was planned and the remaining unplanned.
+
+##### **District Spending**
+
+###### **Overall**
+
+```{r ed-district-overall}
+# Quick Summary
+district_spending_exp_final %>%
+    filter(demand_desc == "EDUCATION") %>%
+    group_by(year) %>%
+    summarise(gross = sum(gross),
+              net_payment = sum(net_payment))
+```
+
+* The net payments amount for Education in Himachal Pradesh in 2018-19 was 38 Bn., a 4% increase over the previous year. 
+
+###### **Allocations Over Time**
+
+```{r ed-district-over-time}
+# Trends for budget allocation over time
+district_spending_exp_final %>%
+    filter(demand_desc == "EDUCATION") %>%
+    mutate(month = floor_date(transaction_date, unit = "month")) %>%
+    group_by(month) %>%
+    summarise(gross = sum(gross),
+              net_payment = sum(net_payment)) %>%
+    gather(type, amount, -month) %>%
+    ggplot(aes(x = month, y = amount, color = type)) +
+    geom_line() + geom_point()
+```
+
+###### **Top Districts & Treasuries**
+
+```{r ed-distirct-treasuries}
+# District Wise spending
+district_spending_exp_final %>%
+    filter(demand_desc == "EDUCATION") %>%
+    group_by(year, district) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    spread(year, net_payment, fill = 0) %>%
+    arrange(desc(`2018-19`)) %>%
+    mutate(`net_payment (2018-19)` = sum(`2018-19`),
+           `net_payment (2017-18)` = sum(`2017-18`)) %>%
+    mutate(`% of net_payment (2018-19)` = percent(`2018-19`/`net_payment (2018-19)`),
+           `% of net_payment (2017-18)` = percent(`2017-18`/`net_payment (2017-18)`)) %>%
+    select(district, `2018-19`, `% of net_payment (2018-19)`, `2017-18`, `% of net_payment (2017-18)`)
+
+# % of Every District's Spending
+district_spending_exp_final %>%
+    filter(year == "2018-19") %>%
+    mutate(ed_flag = if_else(is.na(demand_desc) | demand_desc != "EDUCATION", 
+                             "OTHER", "EDUCATION")) %>%
+    group_by(ed_flag, district) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    spread(ed_flag, net_payment, fill = 0) %>%
+    mutate(percent_ed = percent(EDUCATION/(EDUCATION + OTHER))) %>%
+    arrange(desc(EDUCATION))
+
+# Treasury Wise spending
+district_spending_exp_final %>%
+    filter(year == "2018-19") %>%
+    mutate(ed_flag = if_else(is.na(demand_desc) | demand_desc != "EDUCATION", 
+                             "OTHER", "EDUCATION")) %>%
+    group_by(ed_flag, treasury) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    spread(ed_flag, net_payment, fill = 0) %>%
+    mutate(percent_ed = percent(EDUCATION/(EDUCATION + OTHER))) %>%
+    arrange(desc(EDUCATION))
+
+# Treasuries with Highest % Share in Education
+district_spending_exp_final %>%
+    filter(year == "2018-19") %>%
+    mutate(ed_flag = if_else(is.na(demand_desc) | demand_desc != "EDUCATION", 
+                             "OTHER", "EDUCATION")) %>%
+    group_by(ed_flag, treasury) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    spread(ed_flag, net_payment, fill = 0) %>%
+    mutate(percent_ed = percent(EDUCATION/(EDUCATION + OTHER))) %>%
+    arrange(desc(percent_ed))
+```
+
+* Shimla Capital Treasury and Dharamsala have respectively 17.78% and 16.37% of all education spending expenditure.
+* Treasuries like Kamrau, Kupvi and Bhalie have over 70% of their budget spending in education.
+
+```{r ed-district-account-heads}
+# Major Expenditure 
+district_spending_exp_final %>%
+    filter(demand_desc == "EDUCATION") %>%
+    group_by(year, major_desc) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    spread(year, net_payment, fill = 0) %>%
+    arrange(desc(`2018-19`)) %>%
+    mutate(`Total net_payment (2018-19)` = sum(`2018-19`),
+           `Total net_payment (2017-18)` = sum(`2017-18`)) %>%
+    mutate(`% of net_payment (2018-19)` = percent(`2018-19`/`Total net_payment (2018-19)`),
+           `% of net_payment (2017-18)` = percent(`2017-18`/`Total net_payment (2017-18)`)) %>%
+    select(major_desc, `2018-19`, `% of net_payment (2018-19)`, `2017-18`, `% of net_payment (2017-18)`)
+
+# Major Expenditure
+district_spending_exp_final %>%
+    filter(demand_desc == "EDUCATION" & major_desc == "GENERAL EDUCATION") %>%
+    group_by(year, sub_major_desc) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    spread(year, net_payment, fill = 0) %>%
+    arrange(desc(`2018-19`)) %>%
+    mutate(`Total net_payment (2018-19)` = sum(`2018-19`),
+           `Total net_payment (2017-18)` = sum(`2017-18`)) %>%
+    mutate(`% of net_payment (2018-19)` = percent(`2018-19`/`Total net_payment (2018-19)`),
+           `% of net_payment (2017-18)` = percent(`2017-18`/`Total net_payment (2017-18)`)) %>%
+    select(sub_major_desc, `2018-19`, `% of net_payment (2018-19)`, `2017-18`, `% of net_payment (2017-18)`)
+
+# Sub-major Expenditure
+# Elementary Education
+district_spending_exp_final %>%
+    filter(demand_desc == "EDUCATION" & 
+             major_desc == "GENERAL EDUCATION" &
+             sub_major_desc == "ELEMENTARY EDUCATION") %>%
+    group_by(year, minor_desc) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    spread(year, net_payment, fill = 0) %>%
+    arrange(desc(`2018-19`)) %>%
+    mutate(`Total net_payment (2018-19)` = sum(`2018-19`),
+           `Total net_payment (2017-18)` = sum(`2017-18`)) %>%
+    mutate(`% of net_payment (2018-19)` = percent(`2018-19`/`Total net_payment (2018-19)`),
+           `% of net_payment (2017-18)` = percent(`2017-18`/`Total net_payment (2017-18)`)) %>%
+    select(minor_desc, `2018-19`, `% of net_payment (2018-19)`, `2017-18`, `% of net_payment (2017-18)`)
+
+# Secondary Education
+district_spending_exp_final %>%
+    filter(demand_desc == "EDUCATION" & 
+             major_desc == "GENERAL EDUCATION" &
+             sub_major_desc == "SECONDARY EDUCATION") %>%
+    group_by(year, minor_desc) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    spread(year, net_payment, fill = 0) %>%
+    arrange(desc(`2018-19`)) %>%
+    mutate(`Total net_payment (2018-19)` = sum(`2018-19`),
+           `Total net_payment (2017-18)` = sum(`2017-18`)) %>%
+    mutate(`% of net_payment (2018-19)` = percent(`2018-19`/`Total net_payment (2018-19)`),
+           `% of net_payment (2017-18)` = percent(`2017-18`/`Total net_payment (2017-18)`)) %>%
+    select(minor_desc, `2018-19`, `% of net_payment (2018-19)`, `2017-18`, `% of net_payment (2017-18)`)
+
+# Minor Expenditure
+# Elementary Education
+district_spending_exp_final %>%
+    filter(demand_desc == "EDUCATION" & 
+             major_desc == "GENERAL EDUCATION" &
+             sub_major_desc == "ELEMENTARY EDUCATION" &
+             minor_desc == "GOVERNMENT PRIMARY SCHOOLS") %>%
+    group_by(year, sub_minor_desc) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    spread(year, net_payment, fill = 0) %>%
+    arrange(desc(`2018-19`)) %>%
+    mutate(`Total net_payment (2018-19)` = sum(`2018-19`),
+           `Total net_payment (2017-18)` = sum(`2017-18`)) %>%
+    mutate(`% of net_payment (2018-19)` = percent(`2018-19`/`Total net_payment (2018-19)`),
+           `% of net_payment (2017-18)` = percent(`2017-18`/`Total net_payment (2017-18)`)) %>%
+    select(sub_minor_desc, `2018-19`, `% of net_payment (2018-19)`, `2017-18`, `% of net_payment (2017-18)`)
+
+# Secondary Education
+district_spending_exp_final %>%
+    filter(demand_desc == "EDUCATION" & 
+             major_desc == "GENERAL EDUCATION" &
+             sub_major_desc == "SECONDARY EDUCATION" &
+             minor_desc == "GOVERNMENT SECONDARY SCHOOLS") %>%
+    group_by(year, sub_minor_desc) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    spread(year, net_payment, fill = 0) %>%
+    arrange(desc(`2018-19`)) %>%
+    mutate(`Total net_payment (2018-19)` = sum(`2018-19`),
+           `Total net_payment (2017-18)` = sum(`2017-18`)) %>%
+    mutate(`% of net_payment (2018-19)` = percent(`2018-19`/`Total net_payment (2018-19)`),
+           `% of net_payment (2017-18)` = percent(`2017-18`/`Total net_payment (2017-18)`)) %>%
+    select(sub_minor_desc, `2018-19`, `% of net_payment (2018-19)`, `2017-18`, `% of net_payment (2017-18)`)
+```
+
+* 96.42% of all net payments in education were towards General Education
+* General Education net payments consists of Elementary (54.28%) & Secondary (36.37%)
+
+###### **Statement of Expenditure**
+
+```{r ed-district-soe}
+# Education Overall
+district_spending_exp_final %>%
+    filter(demand_desc == "EDUCATION") %>%
+    group_by(year, soe_description) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    spread(year, net_payment, fill = 0) %>%
+    arrange(desc(`2018-19`)) %>%
+    mutate(`Total net_payment (2018-19)` = sum(`2018-19`),
+           `Total net_payment (2017-18)` = sum(`2017-18`)) %>%
+    mutate(`% of net_payment (2018-19)` = percent(`2018-19`/`Total net_payment (2018-19)`),
+           `% of net_payment (2017-18)` = percent(`2017-18`/`Total net_payment (2017-18)`)) %>%
+    select(soe_description, `2018-19`, `% of net_payment (2018-19)`, `2017-18`, `% of net_payment (2017-18)`)
+```
+
+~78% of District spending expenditure is towards direct salries.
+
+### **Session Info**
+
+```{r session}
+# Information about the machine and enviroment
+sessionInfo()
+```

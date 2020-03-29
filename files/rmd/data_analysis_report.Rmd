@@ -1,0 +1,999 @@
+---
+title: '**Data Analysis Report**'
+author: "TheDataAreClean"
+date: "28th March, '20"
+output:
+  html_document:
+    highlight: tango
+    theme: yeti
+    toc: yes
+    toc_depth: 4
+  pdf_document:
+    toc: yes
+    toc_depth: '4'
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(message = FALSE)
+
+# Load packages
+library(tidyverse)
+library(formattable)
+library(lubridate)
+library(scales)
+library(ggalt)
+library(treemapify)
+library(ggplotify)
+```
+
+### **Background**
+
+Increase visibility into budgets data in India to improve civic participation.
+
+* Citizens have limited access to data on government budgets in India.
+* The state budget documents are not easily consumable with detailed information locked in closed formats (PDF, etc.).
+* Lack of metadata hinders the process of easy search-ability for relevant fiscal data.
+* Restricted public engagement with fiscal data leads constrained public participation with fiscal issues.
+
+### **Objective**
+
+Analysis of Himachal Pradesh state budgetary and district spending expenditure data.
+
+* Comparative analysis for a sector of choice (Primary Education, Public Health or other).
+* Identify some key fund flow issues and/or interesting data insights/stories.
+* Use open-source softwares like Python, R, LibreOffice Calc or more, to keep the output shareable giving options to collate collaborative feedback.
+
+### **Information**
+
+#### **Related Blogs**
+
+Existing work at CivicDataLab:
+
+* [Tracking Flow of Public Funds through Open Data](https://medium.com/civicdatalab/tracking-flow-of-public-funds-through-open-data-1ace0e5b6163)
+* [Roadmap for co-creating the Fiscal Data Explorer](https://medium.com/civicdatalab/roadmap-for-co-creating-the-fiscal-data-explorer-79818a53728f)
+* [Design Research for Fiscal Data Explorer - A Work in Progress](https://medium.com/civicdatalab/design-research-for-fiscal-data-explorer-a-work-in-progress-43a07275b1c1)
+* [Selecting schemes and sectors for Himachal Pradesh Fiscal Data Explorer - Process and Criteria](https://blog.openbudgetsindia.org/selecting-schemes-and-sectors-for-himachal-fiscal-data-explorer-process-and-criteria-de711f578166)
+
+#### **Extended Reading list**
+
+In-case one wishes to dig deeper, an [extended reading list](https://docs.google.com/document/d/1WYHy_7FLYI84XvXzcW277sqY2oA59zQFAcvbCVbJcR8/edit) explaining some of the key concepts of public finance in India and associated data.
+
+### **Contents**
+
+This report will cover the following areas:
+
+1. **Data Health**
+2. **Overall Analysis**
+3. **Sector Analysis**
+4. **Further Questions**
+5. **Additional Ideas**
+6. **Challenge**
+
+### **Data Health Report**
+
+#### **Files Recieved**
+
+As a part of the assignment, 4 data files in `.csv` format were provided were provided and 2 metadata files in `.xlsx` format with descriptions of the data file fields.
+
+```{r data-recieved}
+# Data files for the assignment
+dir("../data/raw/")
+
+# Metadata files for the assignment
+dir("../data/metadata/")
+```
+
+#### **Details**
+
+**Datasets**
+**_State Budget Expenditures_** & **_District Spending Expenditures_** for FY 2017-18 & FY 2018-19
+
+**Information**
+**_State Budget Expenditure_**: Information like Account Heads, Statement of Expenditure, Sanctions, Revisions;
+
+**_District Spending Expenditures_**: Information like District, Treasury, DDO, Account Heads, Statement of Expenditure, Gross and Net Payments.
+
+Additional details can be found in the [Data Health Report](https://www.google.com) in the GitHub repository.
+
+### **Overall Analysis**
+
+#### **Read**
+
+Read the cleaned dataset after processing through the Data Health Report
+
+```{r read, cache = TRUE}
+# State expenditure data
+budget_exp_final <- read_csv("../data/processed/budget_exp_final.csv")
+
+# Distirct spending data
+district_spending_exp_final <- read_csv("../data/processed/district_spending_exp_final.csv")
+```
+
+#### **Clean**
+
+Normalize the data fields across files for analysis.
+
+```{r clean, cache = TRUE}
+# Format the monetary value fields
+# State Budget Expenditure
+budget_exp_final$sanction <- accounting(budget_exp_final$sanction)
+budget_exp_final$addition <- accounting(budget_exp_final$addition)
+budget_exp_final$savings <- accounting(budget_exp_final$savings)
+budget_exp_final$revised <- accounting(budget_exp_final$revised)
+
+# District Spending  Expenditure
+district_spending_exp_final$gross <- accounting(district_spending_exp_final$gross)
+district_spending_exp_final$agded <- accounting(district_spending_exp_final$agded)
+district_spending_exp_final$btded <- accounting(district_spending_exp_final$btded)
+district_spending_exp_final$net_payment <- accounting(district_spending_exp_final$net_payment)
+```
+
+#### **State Budget Expenditure**
+
+```{r overall}
+# Quick Summary
+state_budget_summary <- budget_exp_final %>%
+                            group_by(year) %>%
+                            summarise(sanction = sum(sanction),
+                                      revised = sum(revised))
+
+# Rename Fields
+names(state_budget_summary) <- c("Fiscal Year", "Sanction", "Revised")
+
+# Print formatted Table
+formattable(state_budget_summary, list(
+                                    Sanction = color_bar("orange"),
+                                    Revised = color_bar("lightgreen")
+                                    )
+            )
+```
+
+* For the year 2018-19; the sanctioned budget was 1.59 Bn. & the revised budget was 1.51Bn.
+* ~14.5% increase in the sanctioned state budget in the year 2018-19 over 2017-18.
+* The revised state budget for 2018-17 was ~95% of the original sanctioned budget; and ~97.2% in 2017-18.
+
+##### **Top Account Heads**
+
+```{r top-account-heads}
+# Account Head Wise spending
+state_budget_demand <- budget_exp_final %>%
+                            group_by(year, demand_desc) %>%
+                            summarise(sanction = sum(sanction)) %>%
+                            spread(year, sanction, fill = 0) %>%
+                            arrange(desc(`2018-19`)) %>%
+                            mutate(`Total Sanction (2018-19)` = sum(`2018-19`),
+                                   `Total Sanction (2017-18)` = sum(`2017-18`)) %>%
+                            mutate(`% of Total (2018-19)` = formattable::percent(`2018-19`/`Total Sanction (2018-19)`),
+                                   `% of Total (2017-18)` = formattable::percent(`2017-18`/`Total Sanction (2017-18)`)) %>%
+                            select(demand_desc, `2018-19`, `% of Total (2018-19)`, `2017-18`, `% of Total (2017-18)`)
+
+# Rename Fields
+colnames(state_budget_demand)[1] <- "Demand"
+
+# Plot bar chart for representation
+# Absolutes
+state_budget_demand %>%
+        select(Demand, `2018-19`, `2017-18`) %>%
+        head(10) %>%
+        gather(Year, Amount, -Demand) %>%
+        mutate(Demand = as_factor(Demand)) %>%
+        ggplot(aes(x = Demand, y = Amount, fill = Year)) +
+            geom_bar(stat = "identity", position = position_dodge()) +
+            scale_x_discrete(label = function(x) stringr::str_trunc(x, 12)) +
+            scale_y_continuous(labels = comma) +
+            labs(title = "Top 10 Deparments by State Budget Expenditure", x = "Department", y = "Amount") +
+            theme_minimal() + theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1))
+
+# Percentage
+state_budget_demand %>%
+        select(Demand, `% of Total (2018-19)`, `% of Total (2017-18)`) %>%
+        head(10) %>%
+        gather(Year, Amount, -Demand) %>%
+        mutate(Demand = as_factor(Demand)) %>%
+        ggplot(aes(x = Demand, y = Amount, fill = Year)) +
+            geom_bar(stat = "identity", position = position_dodge()) +
+            scale_x_discrete(label = function(x) stringr::str_trunc(x, 12)) +
+            scale_y_continuous(labels = percent) +
+            labs(title = "Top 10 Deparments by State Budget Expenditure", x = "Department", y = "% Amount") +
+            theme_minimal() + theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1))
+```
+
+* Finance was alloyed the highest amount of all account heads, 30.49% of total sanctioned expenditure for the year; followed by Education with 14.12% & Public Works – Roads Bridges & Buildings at 10.26%
+* This trend has followed form 2017-18 in terms of priority for the state budget allocations.
+
+##### **Voted vs Charged**
+
+```{r voted-charged, warning = FALSE}
+# Voted/Charged
+budget_exp_final %>%
+        group_by(year, voted_charged) %>%
+        summarise(sanction = sum(sanction)) %>%
+        spread(voted_charged, sanction) %>%
+        mutate(percent_charged = formattable::percent(C/(V+C)),
+               percent_voted = formattable::percent(V/(V+C))) %>%
+        select(year, percent_voted, percent_charged) %>%
+        gather(Bucket, Percentage, -year) %>%
+        ggplot(aes(x = year, y = Percentage, fill = Bucket)) +
+                geom_bar(stat = "identity", position = "stack") +
+                scale_y_continuous(labels = percent) +
+                scale_fill_discrete(name = "Type", labels = c("Charged", "Voted")) + 
+                labs(title = "Voted vs Charged State Budget Expenditure", x = "Year", y = "%") +
+                theme_minimal() + theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) +
+                coord_flip()
+```
+
+~83% of all State Budget Expenditure is Voted for, remaining 17%  is charged.
+
+##### **Plan vs Non-Plan**
+
+```{r plan-non-plan, warning = FALSE}
+# Plan/Non-Plan
+budget_exp_final %>%
+        group_by(year, plan_nonplan) %>%
+        summarise(sanction = sum(sanction)) %>%
+        spread(plan_nonplan, sanction) %>%
+        mutate(percent_plan = formattable::percent(P/(N+P)),
+               percent_nonplan = formattable::percent(N/(N+P))) %>%
+        select(year, percent_plan, percent_nonplan) %>%
+        gather(Bucket, Percentage, -year) %>%
+        ggplot(aes(x = year, y = Percentage, fill = Bucket)) +
+                geom_bar(stat = "identity", position = "stack") +
+                scale_y_continuous(labels = percent) +
+                scale_fill_discrete(name = "Type", labels = c("Non-Plan", "Plan")) + 
+                labs(title = "Plan vs Non-Plan State Budget Expenditure", x = "Year", y = "%") +
+                theme_minimal() + theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) +
+                coord_flip()
+                
+```
+
+Over 78% of all State Budget expenditure is Non-Plan, and remaining ~22% under Plan.
+
+##### **YoY Comparison**
+
+Changes in allotments in State Budget accross departments b/w 2018-19 and 2017-18.
+
+```{r yoy-account-heads-inc}
+# Overall Top 10 Investments
+# Absolute change in account heads expenditure
+state_budget_top_account_changes_absolute <- budget_exp_final %>%
+                                                group_by(year, demand_desc) %>%
+                                                summarise(sanction = sum(sanction)) %>%
+                                                spread(year, sanction, fill = 0) %>%
+                                                mutate(delta = `2018-19` - `2017-18`,
+                                                      percent_delta = formattable::percent((`2018-19` - `2017-18`)/`2017-18`)) %>%
+                                                select(demand_desc, delta, percent_delta) %>%
+                                                arrange(desc(delta)) %>%
+                                                head(5)
+
+# Rename Fields
+names(state_budget_top_account_changes_absolute) <- c("Department", "Change", "% Change")
+
+# Print formatted Table
+formattable(state_budget_top_account_changes_absolute, list(
+                                                            Change = color_bar("lightgreen"),
+                                                            `% Change` = color_tile("paleturquoise", "turquoise")
+                                                            )
+            )
+
+# % change in account heads expenditure
+state_budget_top_account_changes_percent <- budget_exp_final %>%
+                                                group_by(year, demand_desc) %>%
+                                                summarise(sanction = sum(sanction)) %>%
+                                                spread(year, sanction, fill = 0) %>%
+                                                mutate(delta = `2018-19` - `2017-18`,
+                                                      percent_delta = formattable::percent((`2018-19` - `2017-18`)/`2017-18`)) %>%
+                                                select(demand_desc, delta, percent_delta) %>%
+                                                arrange(desc(percent_delta)) %>%
+                                                head(5)
+
+# Rename Fields
+names(state_budget_top_account_changes_percent) <- c("Department", "Change", "% Change")
+
+# Print formatted Table
+formattable(state_budget_top_account_changes_percent, list(
+                                                        Change = color_bar("lightgreen"),
+                                                        `% Change` = color_tile("paleturquoise", "turquoise")
+                                                        )
+            )
+```
+
+* Finance, Education & Public Works has seen the most increase in absolute sanctions numbers in 2018-19 over 2017-18.
+* Tourism and Civil Aviation (61.84%), Industries Mineral Supplies and Information Technology (52.77%) and Agriculture (34.04%) have seen highest sanctions in terms of % change.
+
+```{r yoy-account-heads-dec}
+# Overall Top 10 Disinvestments
+# Absolute change in account heads expenditure
+state_budget_bottom_account_changes_absolute <- budget_exp_final %>%
+                                                    group_by(year, demand_desc) %>%
+                                                    summarise(sanction = sum(sanction)) %>%
+                                                    spread(year, sanction, fill = 0) %>%
+                                                    mutate(delta = `2018-19` - `2017-18`,
+                                                          percent_delta = formattable::percent((`2018-19` - `2017-18`)/`2017-18`)) %>%
+                                                    select(demand_desc, delta, percent_delta) %>%
+                                                    arrange(delta) %>%
+                                                    head(2)
+
+# Rename Fields
+names(state_budget_bottom_account_changes_absolute) <- c("Department", "Change", "% Change")
+
+# Print formatted Table
+formattable(state_budget_bottom_account_changes_absolute, list(
+                                                            Change = color_bar("lightgreen"),
+                                                            `% Change` = color_tile("paleturquoise", "turquoise")
+                                                            )
+            )
+```
+ 
+Election (37.58%), Labour Employment and Training (23.19%) have seen highest decrease sanctions in terms of % change.
+
+##### **Sanction vs Revised**
+
+Comparison of sanction vs revised 2018-19 State Budget Expenditure to understand departments with most changes.
+
+```{r sanction-revised-positive-exp}
+## 2018-19 positive absolute change
+state_budget_postive_change_absolute <- budget_exp_final %>%
+                                            filter(year == "2018-19") %>%
+                                            group_by(demand_desc) %>%
+                                            summarise(sanction = sum(sanction),
+                                                      revised = sum(revised)) %>%
+                                            mutate(revision_delta = (revised - sanction),
+                                                   percent_delta =  formattable::percent((revised - sanction)/sanction)) %>%
+                                            arrange(desc(revision_delta)) %>%
+                                            select(demand_desc, revision_delta, percent_delta) %>%
+                                            head(5)
+    
+# Rename Fields
+names(state_budget_postive_change_absolute) <- c("Department", "Change", "% Change")
+
+# Print formatted Table
+formattable(state_budget_postive_change_absolute, list(
+                                                    Change = color_bar("gold"),
+                                                    `% Change` = color_tile("violet", "darkviolet")
+                                                    )
+            )
+
+## 2018-19 positive percent change
+state_budget_postive_change_percent <- budget_exp_final %>%
+                                            filter(year == "2018-19") %>%
+                                            group_by(demand_desc) %>%
+                                            summarise(sanction = sum(sanction),
+                                                      revised = sum(revised)) %>%
+                                            mutate(revision_delta = (revised - sanction),
+                                                   percent_delta =  formattable::percent((revised - sanction)/sanction)) %>%
+                                            arrange(desc(percent_delta)) %>%
+                                            select(demand_desc, revision_delta, percent_delta) %>%
+                                            head(5)
+
+    
+# Rename Fields
+names(state_budget_postive_change_percent) <- c("Department","Change", "% Change")
+
+# Print formatted Table
+formattable(state_budget_postive_change_percent, list(
+                                                    Change = color_bar("gold"),
+                                                    `% Change` = color_tile("violet", "darkviolet")
+                                                    )
+            )
+```
+
+* Land Revenue and District Administration & Finance saw one of the highest increase from sanctions to revisions.
+* Both financial years saw over huge increases in election expenditure from sanctions to revised 74.37% in 2018-19.
+
+```{r sanction-revised-negative-exp}
+## 2018-19 negative absolute change
+state_budget_negative_change_absolute <- budget_exp_final %>%
+                                            filter(year == "2018-19") %>%
+                                            group_by(demand_desc) %>%
+                                            summarise(sanction = sum(sanction),
+                                                      revised = sum(revised)) %>%
+                                            mutate(revision_delta = (revised - sanction),
+                                                   percent_delta =  formattable::percent((revised - sanction)/sanction)) %>%
+                                            arrange(revision_delta) %>%
+                                            select(demand_desc, revision_delta, percent_delta) %>%
+                                            head(5)
+    
+# Rename Fields
+names(state_budget_negative_change_absolute) <- c("Department", "Change", "% Change")
+
+# Print formatted Table
+formattable(state_budget_negative_change_absolute, list(
+                                                    Change = color_bar("gold"),
+                                                    `% Change` = color_tile("violet", "darkviolet")
+                                                    )
+            )
+
+## 2018-19 positive percent change
+state_budget_negative_change_percent <- budget_exp_final %>%
+                                            filter(year == "2018-19") %>%
+                                            group_by(demand_desc) %>%
+                                            summarise(sanction = sum(sanction),
+                                                      revised = sum(revised)) %>%
+                                            mutate(revision_delta = (revised - sanction),
+                                                   percent_delta =  formattable::percent((revised - sanction)/sanction)) %>%
+                                            arrange(percent_delta) %>%
+                                            select(demand_desc, revision_delta, percent_delta) %>%
+                                            head(5)
+
+    
+# Rename Fields
+names(state_budget_negative_change_percent) <- c("Department", "Change", "% Change")
+
+# Print formatted Table
+formattable(state_budget_negative_change_percent, list(
+                                                    Change = color_bar("gold"),
+                                                    `% Change` = color_tile("violet", "darkviolet")
+                                                    )
+            )
+```
+
+* Education saw the highest decrease from sanction to revised in both years with 34 Mn, ~15.22% in 2018-19.
+* Scheduled Castes Sub Plan, Rural Development, Tribal Development all saw decreases from sanction to revised.
+
+#### **District Spending Expenditure**
+
+##### **Overall**
+
+```{r district-overall}
+# Quick Summary
+district_spending_summary <- district_spending_exp_final %>%
+                                group_by(year) %>%
+                                summarise(gross = sum(gross),
+                                net_payment = sum(net_payment))
+
+# Rename Fields
+names(district_spending_summary) <- c("Fiscal Year", "Gross", "Net Payment")
+
+# Print formatted Table
+formattable(district_spending_summary, list(
+                                            Gross = color_bar("orange"),
+                                            `Net Payment` = color_bar("lightgreen")
+                                            )
+            )
+```
+
+The net payments amount for Himachal Pradesh in 2018-19 was 330.9 Bn.; a 12.7% increase over the previous years District Spending.
+
+##### **Spending Over Time**
+
+```{r district-over-time}
+# Trends for budget allocation over time
+district_spending_exp_final %>%
+    mutate(month = floor_date(transaction_date, unit = "month")) %>%
+    group_by(month) %>%
+    summarise(gross = sum(gross),
+              net_payment = sum(net_payment)) %>%
+    gather(type, amount, -month) %>%
+    ggplot(aes(x = month, y = amount, color = type)) +
+    geom_line() + geom_point() +
+    scale_y_continuous(labels = comma) +
+    scale_color_discrete(name = "Cylinders", labels = c("Gross", "Net Payment")) +
+    labs(title = "District Spending Expenditure Over Time", x = "Time", y = "Amount") +
+    theme_minimal()
+```
+
+Majority of district level spending expenditure happened during the month of March (EoY), a trend that can traced through both fiscal years.
+
+##### **Top Districts & Treasuries**
+
+```{r distirct-treasuries}
+# District Wise spending
+district_spending_exp_final %>%
+    filter(year == "2018-19") %>%
+    group_by(district) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    arrange(desc(net_payment)) %>%
+    mutate(net_payment_total = sum(net_payment)) %>%
+    mutate(net_payment_percent = formattable::percent(net_payment/net_payment_total)) %>%
+    select(district, net_payment_percent) %>%
+    mutate(district = as_factor(district)) %>%
+    ggplot(aes(x = district, y = net_payment_percent, label = net_payment_percent)) + 
+        geom_point(col = "blue", size = 3) + geom_text(vjust = -0.3) +
+        geom_segment(aes(x = district, xend = district, y = 0, yend = net_payment_percent)) + 
+    scale_y_continuous(labels = percent) +
+    labs(title="District Wise Share of Spending Expenditure", x = "District", y = "%") +
+    theme_minimal() + theme(axis.text.x = element_text(angle = 65, vjust = 1, hjust = 1))
+
+# Treasury Wise spending
+district_spending_exp_final %>%
+    filter(year == "2018-19") %>%
+    group_by(treasury) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    arrange(desc(net_payment)) %>%
+    mutate(net_payment_total = sum(net_payment)) %>%
+    mutate(net_payment_percent = formattable::percent(net_payment/net_payment_total)) %>%
+    select(treasury, net_payment_percent) %>%
+    head(10) %>%
+    mutate(treasury = as_factor(treasury)) %>%
+    ggplot(aes(x = reorder(treasury, desc(treasury)), 
+               y = net_payment_percent, 
+               label = net_payment_percent)) + 
+        geom_point(col = "tomato2", size = 3) + geom_text(hjust = -0.2) +
+        geom_segment(aes(x = treasury, xend = treasury, 
+                         y = min(net_payment_percent), yend = max(net_payment_percent)), 
+                     linetype = "dashed", size = 0.1) + 
+    scale_y_continuous(labels = percent) +
+    labs(title="Top 10 Treasuries for Spending Expenditure", x = "Treasury", y = "%") +
+    theme_minimal() + theme(axis.text.x = element_text(angle = 65, vjust = 1, hjust = 1)) +
+    coord_flip()
+```
+
+##### **Top Account Heads**
+
+```{r district-account-heads}
+# Account Head wise spending
+district_spending_account_yoy <- district_spending_exp_final %>%
+                                    group_by(year, demand_desc) %>%
+                                    summarise(net_payment = sum(net_payment)) %>%
+                                    spread(year, net_payment, fill = 0) %>%
+                                    arrange(desc(`2018-19`)) %>%
+                                    mutate(net_payment_18_19 = sum(`2018-19`),
+                                           net_payment_17_18 = sum(`2017-18`)) %>%
+                                    mutate(net_payment_18_19_percent = 
+                                               formattable::percent(`2018-19`/net_payment_18_19),
+                                           net_payment_17_18_percent = 
+                                               formattable::percent(`2017-18`/net_payment_17_18)) %>%
+                                    select(demand_desc, net_payment_18_19_percent, net_payment_17_18_percent) %>%
+                                    head(8)
+
+# Plot the major account heds
+# Prep Data
+left_label <- paste(stringr::str_trunc(district_spending_account_yoy$demand_desc, 12),
+                    district_spending_account_yoy$net_payment_17_18_percent,sep = ", ")
+right_label <- paste(stringr::str_trunc(district_spending_account_yoy$demand_desc, 12),
+                     district_spending_account_yoy$net_payment_18_19_percent,sep=", ")
+district_spending_account_yoy$class <- ifelse((
+    district_spending_account_yoy$net_payment_18_19_percent - 
+        district_spending_account_yoy$net_payment_17_18_percent) < 0, "red", "green")
+
+# Plot
+p <- ggplot(district_spending_account_yoy) + 
+        geom_segment(aes(x = 1, xend = 2, 
+                         y = net_payment_17_18_percent, yend = net_payment_18_19_percent, 
+                         col = class), size=.75, show.legend = F) + 
+                    geom_vline(xintercept = 1, linetype = "dashed", size = .1) + 
+                    geom_vline(xintercept = 2, linetype = "dashed", size = .1) +
+                    scale_color_manual(labels = c("Up", "Down"), 
+                                       values = c("green" = "#00ba38", "red" = "#f8766d")) +
+                    labs(x = "", y = "", title = "Top Department Spending over Fiscal Years") +
+                    xlim(.5, 2.5) +
+                    ylim(0,(1.1*(max(district_spending_account_yoy$net_payment_17_18_percent,
+                                     district_spending_account_yoy$net_payment_18_19_percent)))) +
+                    theme_minimal()
+
+# Add texts
+p <- p + geom_text(label = left_label, check_overlap = TRUE,
+                   y = district_spending_account_yoy$net_payment_17_18_percent,
+                   x = rep(1, NROW(district_spending_account_yoy)), 
+                   hjust = 1.1, size = 3.5)
+
+p <- p + geom_text(label = right_label,  check_overlap = TRUE,
+                   y = district_spending_account_yoy$net_payment_18_19_percent,
+                   x = rep(2, NROW(district_spending_account_yoy)), 
+                   hjust = -0.1, size = 3.5)
+
+p <- p + geom_text(label="2017-18", 
+                   x = 1, 
+                   y = 1.1*(max(district_spending_account_yoy$net_payment_17_18_percent, 
+                                district_spending_account_yoy$net_payment_18_19_percent)), 
+                   hjust = 1.2, size = 5)  # title
+
+p <- p + geom_text(label="2018-19", 
+                   x = 2, 
+                   y = 1.1*(max(district_spending_account_yoy$net_payment_17_18_percent, 
+                                district_spending_account_yoy$net_payment_18_19_percent)), 
+                   hjust = -0.1, size = 5)  # title
+
+# Minify theme
+p + theme(panel.background = element_blank(), 
+           panel.grid = element_blank(),
+           axis.ticks = element_blank(),
+           axis.text.x = element_blank(),
+           panel.border = element_blank(),
+           plot.margin = unit(c(1,2,1,2), "cm"))
+```
+
+Finance (16.04%), Education (11.49%) and Health and Family Welfare (4.59%) have the highest amount of net payments across both financial years.
+
+```{r na-account-heads}
+# Demand Description is NA
+district_spending_exp_final %>%
+    filter(is.na(demand_desc)) %>%
+    group_by(year, district) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    spread(year, net_payment, fill = 0) %>%
+    arrange(desc(`2018-19`)) %>%
+    mutate(net_payment_18_19 = sum(`2018-19`),
+           net_payment_17_18 = sum(`2017-18`)) %>%
+    mutate(net_payment_18_19_percent = 
+               formattable::percent(`2018-19`/net_payment_18_19),
+           net_payment_17_18_percent = 
+               formattable::percent(`2017-18`/net_payment_17_18)) %>%
+    select(district, net_payment_18_19_percent, net_payment_17_18_percent) %>%
+    gather(year, percent, -district) %>%
+    mutate(district = as_factor(district)) %>%
+    ggplot(aes(x = district, y = percent, fill = year)) +
+            geom_bar(stat = "identity", position = position_dodge()) +
+            scale_y_continuous(labels = percent) +
+            scale_fill_discrete(name = "Fiscal Year", labels = c("2017-18", "2018-19")) + 
+            labs(title = "Department NA across Districts", x = "Department", y = "% Amount") +
+            theme_minimal() + theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1))
+```
+
+26.39% of net payments have no Department info against them, when looking at the district data they are spread across all with Shimla at top with 24.06% of the NA spend and Dharamsala at 14.91%.
+
+##### **Change Over Years**
+
+Top 10 departments with change is spending over the 2 fiscal years.
+
+```{r district-account-heads-change}
+# Abslolute Positive Change in Net Payments
+account_head_change_yoy <- district_spending_exp_final %>%
+      filter(!is.na(demand_desc)) %>%
+      group_by(year, demand_desc) %>%
+      summarise(net_payment = sum(net_payment)) %>%
+      spread(year, net_payment, fill = 0) %>%
+      mutate(delta = `2018-19` - `2017-18`,
+             percent_delta = formattable::percent((`2018-19` - `2017-18`)/`2017-18`)) %>%
+      select(demand_desc, `2018-19`, `2017-18`, delta, percent_delta) %>%
+      arrange(desc(`2018-19`)) %>%
+      head(10)
+
+# Ordering of values
+account_head_change_yoy$demand_desc <- 
+              factor(stringr::str_trunc(account_head_change_yoy$demand_desc, 12),
+                     levels = rev(as.character(stringr::str_trunc(
+                       account_head_change_yoy$demand_desc, 12))
+                       )
+                     )
+
+# Plotting of values
+ggplot(account_head_change_yoy, 
+         aes(x = `2017-18`, xend = `2018-19`, 
+             y = demand_desc, 
+             group = demand_desc)) + 
+      geom_dumbbell(color = "#a3c4dc", 
+                    size = 1, 
+                    colour_xend = "#0e668b") + 
+      scale_x_continuous(label = comma) + 
+      labs(x = "Spending Expenditure", 
+           y = "Department", 
+           title = "Top 10 Departments: Change in Sending over Fiscal Years",
+           subtitle = "2017-18 vs 2018-19") +
+      theme_minimal()
+```
+
+* Power Development, Land Revenue and District Administration, Rural Development had the highest absolute increase in net payments YoY.
+* Power Development (160.48%), Urban Development Town and Country Planning and Housing (77.97%) highest % increase in net payments YoY.
+
+### **Sector Analysis**
+
+Analysis of Education Department entries in the budgetary datasets.
+
+#### **State Budget Expenditure**
+
+##### **Overall**
+```{r ed-overall}
+# Quick Summary
+education_state_budget_overall <- budget_exp_final %>%
+          filter(demand_desc == "EDUCATION") %>%
+          group_by(year) %>%
+          summarise(sanction = sum(sanction),
+                    revised = sum(revised))
+
+# Rename Fields
+names(education_state_budget_overall) <- c("Fiscal Year", "Sanction", "Revised")
+
+# Print formatted Table
+formattable(education_state_budget_overall, list(
+                                                Sanction = color_bar("orange"),
+                                                Revised = color_bar("lightgreen")
+                                                )
+            )
+```
+
+In 2018-19, the revised education budget was down to 85% of originally sanctioned; compared to 95% in 2017-18.
+
+##### **Account Heads**
+
+```{r ed-account-heads, warning = FALSE}
+# Major/Sub-Major Expenditure 
+ed_major_state_expenditure <- budget_exp_final %>%
+          filter(demand_desc == "EDUCATION" & year == "2018-19") %>%
+          group_by(major_desc, sub_major_desc) %>%
+          summarise(sanction = sum(sanction)) %>%
+          mutate(total_sanction = sum(sanction)) %>%
+          mutate(percent_sanction = formattable::percent(sanction/total_sanction)) %>%
+          arrange(desc(sanction))
+
+# Plot the treemap
+ggplot(ed_major_state_expenditure, 
+       aes(area = sanction, fill = percent_sanction, 
+           label = sub_major_desc, subgroup = major_desc)) +
+  geom_treemap() +
+  geom_treemap_subgroup_border() +
+  scale_fill_continuous(name = "Percentage") +
+  geom_treemap_subgroup_text(place = "bottom", grow = T, alpha = 0.5, colour =
+                             "black", fontface = "italic", min.size = 0) +
+  geom_treemap_text(colour = "white", place = "topleft", reflow = T)
+```
+
+* ~98% of all state education expenditure was towards General Education function.
+* The top sub-sectors were Elementary Education (53.76%), Secondary Education (38.54%) & University and Higher Education (7.24%).
+
+```{r ed-account-heads-minor, warning = FALSE}
+# Major/Sub-Major Expenditure 
+ed_major_state_expenditure <- budget_exp_final %>%
+          filter(demand_desc == "EDUCATION" & 
+                   year == "2018-19" &
+                   sub_major_desc == "ELEMENTARY EDUCATION") %>%
+          group_by(minor_desc, sub_minor_desc) %>%
+          summarise(sanction = sum(sanction)) %>%
+          mutate(total_sanction = sum(sanction)) %>%
+          mutate(percent_sanction = formattable::percent(sanction/total_sanction)) %>%
+          arrange(desc(sanction))
+
+# Plot the treemap
+ggplot(ed_major_state_expenditure, 
+       aes(area = sanction, fill = percent_sanction, 
+           label = sub_minor_desc, subgroup = minor_desc)) +
+  geom_treemap() +
+  geom_treemap_subgroup_border() +
+  scale_fill_continuous(name = "Percentage") +
+  geom_treemap_subgroup_text(place = "bottom", grow = T, alpha = 0.5, colour =
+                             "black", fontface = "italic", min.size = 0) +
+  geom_treemap_text(colour = "white", place = "topleft", reflow = T)
+```
+
+```{r ed-account-heads-minor-2, warning = FALSE}
+# Major/Sub-Major Expenditure 
+ed_major_state_expenditure <- budget_exp_final %>%
+          filter(demand_desc == "EDUCATION" & 
+                   year == "2018-19" &
+                   sub_major_desc == "SECONDARY EDUCATION") %>%
+          group_by(minor_desc, sub_minor_desc) %>%
+          summarise(sanction = sum(sanction)) %>%
+          mutate(total_sanction = sum(sanction)) %>%
+          mutate(percent_sanction = formattable::percent(sanction/total_sanction)) %>%
+          arrange(desc(sanction))
+
+# Plot the treemap
+ggplot(ed_major_state_expenditure, 
+       aes(area = sanction, fill = percent_sanction, 
+           label = sub_minor_desc, subgroup = minor_desc)) +
+  geom_treemap() +
+  geom_treemap_subgroup_border() +
+  scale_fill_continuous(name = "Percentage") +
+  geom_treemap_subgroup_text(place = "bottom", grow = T, alpha = 0.5, colour =
+                             "black", fontface = "italic", min.size = 0) +
+  geom_treemap_text(colour = "white", place = "topleft", reflow = T)
+```
+
+Under Elementary Education, 85% of the expenditure was towards Govt. Primary Schools & for Secondary Education, 98% of expenditure was sanctioned towards Govt. Secondary Schools.
+
+##### **Voted vs Charged**
+
+```{r ed-voted-charged, warning = FALSE}
+# Voted/Charged
+budget_exp_final %>%
+        filter(demand_desc == "EDUCATION" & year == "2018-19") %>%
+        group_by(year, voted_charged) %>%
+        summarise(sanction = sum(sanction)) %>%
+        spread(voted_charged, sanction) %>%
+        mutate(percent_charged = formattable::percent(C/(V+C)),
+               percent_voted = formattable::percent(V/(V+C))) %>%
+        select(year, percent_voted, percent_charged) %>%
+        gather(Bucket, Percentage, -year) %>%
+        ggplot(aes(x = year, y = Percentage, fill = Bucket)) +
+                geom_bar(stat = "identity", position = "stack") +
+                scale_y_continuous(labels = percent) +
+                scale_fill_discrete(name = "Type", labels = c("Charged", "Voted")) + 
+                labs(title = "Voted vs Charged State Budget Expenditure", x = "Year", y = "%") +
+                theme_minimal() + theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) +
+                coord_flip()
+```
+
+All the Himachal Pradesh state expenditure towards education was voted for.
+
+##### **Plan vs Non-Plan**
+
+```{r ed-plan-non-plan, warning = FALSE}
+# Plan/Non-Plan
+budget_exp_final %>%
+        filter(demand_desc == "EDUCATION" ) %>%
+        group_by(year, plan_nonplan) %>%
+        summarise(sanction = sum(sanction)) %>%
+        spread(plan_nonplan, sanction) %>%
+        mutate(percent_plan = formattable::percent(P/(N+P)),
+               percent_nonplan = formattable::percent(N/(N+P))) %>%
+        select(year, percent_plan, percent_nonplan) %>%
+        gather(Bucket, Percentage, -year) %>%
+        ggplot(aes(x = year, y = Percentage, fill = Bucket)) +
+                geom_bar(stat = "identity", position = "stack") +
+                scale_y_continuous(labels = percent) +
+                scale_fill_discrete(name = "Type", labels = c("Non-Plan", "Plan")) + 
+                labs(title = "Plan vs Non-Plan State Budget Expenditure", x = "Year", y = "%") +
+                theme_minimal() + theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) +
+                coord_flip()
+                
+```
+
+~16% of the state expenditure towards Education was planned and the remaining non-planned.
+
+#### **District Spending**
+
+##### **Overall**
+
+```{r ed-district-overall}
+# Quick Summary
+education_district_spending_overall <- district_spending_exp_final %>%
+            filter(demand_desc == "EDUCATION") %>%
+            group_by(year) %>%
+            summarise(gross = sum(gross),
+                      net_payment = sum(net_payment))
+
+# Rename Fields
+names(education_district_spending_overall) <- c("Fiscal Year", "Gross", "Net Payments")
+
+# Print formatted Table
+formattable(education_district_spending_overall, list(
+                                                    Gross = color_bar("orange"),
+                                                    `Net Payments` = color_bar("lightgreen")
+                                                    )
+            )
+```
+
+* ~4% increase in payments in 2018-19 over 2017-18
+* Net payments comprise of ~72% of gross in FY 2018-19; and ~71% in 2017-18
+
+##### **Spending Over Time**
+
+```{r ed-district-over-time}
+# Trends for budget allocation over time
+district_spending_exp_final %>%
+    filter(demand_desc == "EDUCATION") %>%
+    mutate(month = floor_date(transaction_date, unit = "month")) %>%
+    group_by(month) %>%
+    summarise(gross = sum(gross),
+              net_payment = sum(net_payment)) %>%
+    gather(type, amount, -month) %>%
+    ggplot(aes(x = month, y = amount, color = type)) +
+    geom_line() + geom_point() +
+    scale_y_continuous(labels = comma) +
+    scale_color_discrete(name = "Cylinders", labels = c("Gross", "Net Payment")) +
+    labs(title = "District Spending Expenditure Over Time", x = "Time", y = "Amount") +
+    theme_minimal()
+```
+
+Majority of district level Education spending expenditure happened during the month of March (EoY), a trend that can traced through both fiscal years.
+
+##### **Top Districts**
+
+```{r ed-distirct-treasuries}
+# District wise education spending
+district_ed <- district_spending_exp_final %>%
+    filter(demand_desc == "EDUCATION" & year == "2018-19") %>%
+    group_by(district) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    arrange(desc(net_payment)) %>%
+    mutate(net_payment_total = sum(net_payment)) %>%
+    mutate(net_payment_percent = formattable::percent(net_payment/net_payment_total)) %>%
+    select(district, net_payment, net_payment_percent)
+
+# Education as % of every district's spending
+percent_ed <- district_spending_exp_final %>%
+    filter(year == "2018-19") %>%
+    mutate(ed_flag = if_else(is.na(demand_desc) | demand_desc != "EDUCATION", 
+                             "OTHER", "EDUCATION")) %>%
+    group_by(ed_flag, district) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    spread(ed_flag, net_payment, fill = 0) %>%
+    mutate(percent_ed = formattable::percent(EDUCATION/(EDUCATION + OTHER))) %>%
+    arrange(desc(EDUCATION)) %>%
+    select(district, percent_ed)
+
+# Join the 2 tables
+district_wise_ed <- district_ed %>%
+                        left_join(percent_ed, by = "district")
+
+# Rename fields
+names(district_wise_ed) <- c("District", "Net Payments", "Ed. Share Overall", "Ed. Share District")
+
+# Print formatted table
+formattable(district_wise_ed, list(
+                                  `Net Payments` = color_bar("lightgreen"),
+                                  `Ed. Share Overall` = color_tile("white", "lightblue"), 
+                                  `Ed. Share District` = color_tile("white", "lightpink")
+                                  )
+            )
+```
+
+* Shimla Capital Treasury and Dharamsala have respectively 17.78% and 16.37% of all education spending expenditure.
+* 19.91% spending in Kullu and 19.34% spending in Bilaspur is towards education.
+* Treasuries like Kamrau, Kupvi and Bhalie have over 70% of their budget spending in education.
+
+##### **Statement of Expenditure**
+
+```{r ed-district-soe}
+# Education Overall
+district_spending_exp_final %>%
+    filter(demand_desc == "EDUCATION") %>%
+    group_by(year, soe_description) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    spread(year, net_payment, fill = 0) %>%
+    arrange(desc(`2018-19`)) %>%
+    mutate(`Total net_payment (2018-19)` = sum(`2018-19`),
+           `Total net_payment (2017-18)` = sum(`2017-18`)) %>%
+    mutate(`% of net_payment (2018-19)` = formattable::percent(`2018-19`/`Total net_payment (2018-19)`),
+           `% of net_payment (2017-18)` = formattable::percent(`2017-18`/`Total net_payment (2017-18)`)) %>%
+    select(soe_description, `% of net_payment (2018-19)`, `% of net_payment (2017-18)`) %>%
+    head(10) %>%
+    gather(year, percent, -soe_description) %>%
+    mutate(soe_description = as_factor(soe_description)) %>%
+    ggplot(aes(x = soe_description, y = percent, fill = year)) +
+            geom_bar(stat = "identity", position = position_dodge()) +
+            scale_x_discrete(label = function(x) stringr::str_trunc(x, 12)) +
+            scale_y_continuous(labels = percent) +
+            labs(title = "Top 10 SOEs by District Spending Expenditure", x = "SOE", y = "% Amount") +
+            scale_fill_discrete(name = "Fiscal Year", labels = c("2017-18", "2018-19")) +
+            theme_minimal() + theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1))
+```
+
+* ~78% of all education spending was towards salaries.
+* 9.6% of spending is towards GIA GENERAL (Salary).
+
+##### **Schemes**
+
+```{r ed-schemes}
+# Education Overall
+ed_schemes <- district_spending_exp_final %>%
+    filter(demand_desc == "EDUCATION" & 
+            year == "2018-19" &
+            (str_detect(sub_minor_desc, pattern = c("YOJNA")) |
+               str_detect(sub_minor_desc, pattern = c("MID DAY")) |
+               str_detect(sub_minor_desc, pattern = c("ABHYAN")) |
+               str_detect(sub_minor_desc, pattern = c("ABHIYAN")))) %>%
+    group_by(sub_minor_desc) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    arrange(desc(net_payment))
+
+# Rename fields
+names(ed_schemes) <- c("Scheme", "Net Payments")
+
+# Print formatted table
+formattable(ed_schemes, list(
+                            `Net Payments` = color_bar("lightgreen")
+                            )
+            )
+```
+
+### **Further Questions**
+
+* In-depth analysis of function and further granularity to identify key spending trends by the education department.
+* DDO level analysis to understand gaps in on-ground dissemination of funds to better identify areas of opportunity.
+* Comparison of public finance data with further state level population, demographics information to analyse against ground reality.
+
+### **Additional Ideas**
+
+* Develop better understanding from other initiatives exploring public finance data for improvement of child education and open budget explorers to identify key intentions and move learn from the same.
+* Understanding the different personas and user journeys on OpenBudgetsIndia by different kind of users & use a data driven approach to customise the platform experience to the user and familiarity with the information at hand.
+
+### **Challenges**
+
+**Sectorial**
+
+* The assignment left me with a lot more questions to answer with my limited knowledge of the financial sector.
+* The documentation was helpful in understanding the basic of public finance data; learning from an industry expert would benefit in finding better insights.
+
+**Technical**
+
+* The entire analysis was done using R and the mainly the tidyverse packages.
+* Lack of availability of a dashboarding tool created a challenge to replicate some ideas and create narrative in-depth data stories.
+
+### **Session Info**
+
+```{r session}
+# Information about the machine and enviroment
+sessionInfo()
+```
