@@ -35,7 +35,7 @@ In-case one wishes to dig deeper, an [extended reading list](https://docs.google
 
 ### **Assignment Repository**
 
-The assignment shared can be found [here](https://gitlab.civicdatalab.in/civicdatalab/public-finance-research-assignment/).
+The assignment shared by CivicDataLab can be found [here](https://gitlab.civicdatalab.in/civicdatalab/public-finance-research-assignment/).
 
 ### **Submission**
 
