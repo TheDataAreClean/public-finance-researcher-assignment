@@ -48,3 +48,13 @@ Final Findings [Presentation](https://docs.google.com/presentation/d/17HV_MKCJfz
 3. Data Analysis Report
 4. Exploratory Analysis Report
 5. Data Health Report
+
+### **Structure**
+
+```
+root
+└── README.md
+└── files
+    └── rmd
+    └── html
+```
