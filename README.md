@@ -39,7 +39,7 @@ The assignment shared by CivicDataLab can be found [here](https://gitlab.civicda
 
 ### **Submission**
 
-Final Findings [Presentation](https://docs.google.com/presentation/d/17HV_MKCJfzeP8RKrPK-cFHwmTtSsxULCD_j7Dz21WrU/edit?usp=sharing) to better communicate not onlt the key findings, but also the analysis process and addtional ideas.
+Final Findings [Presentation](https://docs.google.com/presentation/d/17HV_MKCJfzeP8RKrPK-cFHwmTtSsxULCD_j7Dz21WrU/edit?usp=sharing) to better communicate not only the key findings, but also the analysis process and addtional ideas.
 
 ### **Contents**
 
