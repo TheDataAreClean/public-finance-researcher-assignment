@@ -1,0 +1,299 @@
+---
+title: '**Deep Dive Report**'
+author: "TheDataAreClean"
+date: "6th April, '20"
+output:
+  html_document:
+    highlight: tango
+    theme: yeti
+    toc: yes
+    toc_depth: 4
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(message = FALSE)
+
+# Load packages
+library(tidyverse)
+library(formattable)
+library(lubridate)
+library(scales)
+library(ggalt)
+library(treemapify)
+library(ggplotify)
+```
+
+### **Objective**
+
+Follow-up on initial assignment with a deep dive.
+
+* Specific issues under Education, analyse the account heads for budget expenditure and district spending trends
+* Identify some key fund flow issues and/or interesting data insights/stories
+
+#### **Read**
+
+Read the cleaned dataset after processing through the Data Health Report
+
+```{r read, cache = TRUE}
+# State expenditure data
+budget_exp_final <- read_csv("../data/processed/budget_exp_final.csv")
+
+# Distirct spending data
+district_spending_exp_final <- read_csv("../data/processed/district_spending_exp_final.csv")
+```
+
+#### **Clean**
+
+Normalize the data fields across files for analysis.
+
+```{r clean, cache = TRUE}
+# Format the monetary value fields
+# State Budget Expenditure
+budget_exp_final$sanction <- accounting(budget_exp_final$sanction)
+budget_exp_final$addition <- accounting(budget_exp_final$addition)
+budget_exp_final$savings <- accounting(budget_exp_final$savings)
+budget_exp_final$revised <- accounting(budget_exp_final$revised)
+
+# District Spending  Expenditure
+district_spending_exp_final$gross <- accounting(district_spending_exp_final$gross)
+district_spending_exp_final$agded <- accounting(district_spending_exp_final$agded)
+district_spending_exp_final$btded <- accounting(district_spending_exp_final$btded)
+district_spending_exp_final$net_payment <- accounting(district_spending_exp_final$net_payment)
+```
+
+### **Sector Analysis**
+
+Analysis of Education Department entries in the budgetary datasets.
+
+#### **State Budget Expenditure**
+
+FY 2018-19 state budget expenditure transactions.
+
+```{r overview, warning = FALSE}
+# Account Heads
+state_exp_ed_18_19 <- budget_exp_final %>%
+    filter(demand_desc == "EDUCATION" & year == "2018-19") %>%
+    group_by(major_desc, sub_major_desc) %>%
+    summarise(sanction = sum(sanction), revised = sum(revised)) %>%
+    mutate(percent = (revised - sanction)/sanction) %>%
+    arrange(desc(sanction))
+
+# Rename Fields
+names(state_exp_ed_18_19) <- c("Major", "Sub Major", "Sanction", "Revised", "Percent")
+
+# Format Fields
+state_exp_ed_18_19$Percent <- formattable::percent(state_exp_ed_18_19$Percent)
+
+# Print formatted table
+formattable(state_exp_ed_18_19, list(
+                                    Sanction = color_tile("coral", "tomato"),
+                                    Revised = color_tile("lightgreen", "seagreen"),
+                                    Percent = color_tile("paleturquoise", "turquoise")
+                                    )
+            )
+```
+
+**Findings**
+
+---
+
+* ~98% of all state education expenditure was towards General Education function.
+* The top sub-sectors were Elementary Education (53.76%), Secondary Education (38.54%) & University and Higher Education (7.24%).
+* Adult Education, also part of General Education had ₹724 under sanctions, going down to zero under revised.
+
+##### **Welfare**
+
+Review on the welfare funding under state expenditure FY 2018-19.
+
+```{r welfare-1}
+# Welfare of Scheduled Castes SC
+budget_exp_final %>%
+    filter(demand_desc == "EDUCATION" & year == "2018-19" &
+             major_desc == "WELFARE OF SCHEDULED CASTES SC") %>%
+    group_by(sub_minor_desc) %>%
+    summarise(Sanction = sum(sanction), Revised = sum(revised)) %>%
+    gather(type, amount, -sub_minor_desc) %>%
+    ggplot(aes(x = type, y = amount, fill = type, label = amount)) +
+        geom_bar(stat = "identity") + scale_y_continuous(labels = comma) +
+        geom_text(hjust = 0.5) +
+        labs(title = "Welfare of Scheduled Castes Budget", x = "", y = "Amount") +
+        theme_minimal() + coord_flip()
+```
+
+* Welfare Of Scheduled Castes SC had ₹36,200 under sanctions, revised to zero later.
+* The amount was alloted against Sub-Minor: SCHOLARSHIPS TO MINORITY COMMUNITIES [C00N]
+
+```{r welfare-2}
+# Social Security and Welfare
+budget_exp_final %>%
+    filter(demand_desc == "EDUCATION" & year == "2018-19" &
+             major_desc == "SOCIAL SECURITY AND WELFARE") %>%
+    group_by(sub_minor_desc) %>%
+    summarise(Sanction = sum(sanction), Revised = sum(revised)) %>%
+    gather(type, amount, -sub_minor_desc) %>%
+    ggplot(aes(x = type, y = amount, fill = type, label = amount)) +
+        geom_bar(stat = "identity") + scale_y_continuous(labels = comma) +
+        geom_text(hjust = 0.5) +
+        labs(title = "Social Security and Welfare", x = "", y = "Amount") +
+        theme_minimal() + coord_flip()
+```
+
+* Social Security and Welfare had a little over ₹9,000 under state budget expenditure.
+* The amount was alloted against Sub-Minor: WELFARE OF HANDICAPPED CHILDREN [C00N]; 0.004% of the total education state budget.
+
+##### **Language Development**
+
+```{r lang-dev}
+# Language Development
+lang_dev <- budget_exp_final %>%
+    filter(demand_desc == "EDUCATION" & year == "2018-19" &
+             sub_major_desc == "LANGUAGE DEVELOPMENT") %>%
+    group_by(sub_minor_desc, soe_description) %>%
+    summarise(amount = sum(revised)) %>%
+    arrange(sub_minor_desc, desc(amount))
+
+# Rename Fields
+names(lang_dev) <- c("Sub-Minor", "SOE", "Revised")
+
+# Print formatted table
+formattable(lang_dev, 
+            list(Revised = color_tile("paleturquoise", "turquoise"))
+            )
+```
+
+* All the spending under language development is for Sanskrit Pathshalas.
+* In 2019, Sanskrit was declared as the second official language of HP.
+
+##### **Art and Culture**
+
+```{r art}
+# Art and culture
+budget_exp_final %>%
+    filter(demand_desc == "EDUCATION" & year == "2018-19" &
+             major_desc == "ART AND CULTURE") %>%
+    group_by(soe_description) %>%
+    summarise(sanction = sum(sanction), revised = sum(revised)) %>%
+    gather(type, amount, -soe_description) %>%
+    mutate(type = as_factor(type)) %>%
+    ggplot(aes(x = soe_description, y = amount, fill = type)) +
+        geom_bar(stat = "identity", position = "dodge") +
+        scale_y_continuous(labels = comma) + 
+        scale_fill_discrete(name = "Type", labels = c("Sanction", "Revised")) + 
+        labs(title = "Art and Culture State Budget Expenditure", x = "SOE", y = "Amount") +
+        theme_minimal() + coord_flip()
+```
+
+All the Arts and Culture state budget expenditure was towards State and District Public Libraries, with the majority of amount going towards salaries.
+
+##### **Captial Outlay & Public Works**
+
+```{r capital}
+# Capital Outlay
+budget_exp_final %>%
+    filter(demand_desc == "EDUCATION" & year == "2018-19" &
+             major_desc == "CAPITAL OUTLAY  ON EDUCATION S") %>%
+    group_by(minor_desc) %>%
+    summarise(sanction = sum(sanction), revised = sum(revised)) %>%
+    gather(type, amount, -minor_desc) %>%
+    mutate(type = as_factor(type)) %>%
+    ggplot(aes(x = minor_desc, y = amount, fill = type, label = amount)) +
+        geom_bar(stat = "identity", position = "dodge") +
+        scale_y_continuous(labels = comma) + geom_text(position = position_dodge(width = 0.8)) +
+        scale_fill_discrete(name = "Type", labels = c("Sanction", "Revised")) + 
+        labs(title = "Capital Outlay on Education", x = "Minor", y = "Amount") +
+        theme_minimal() + coord_flip()
+
+# SOE
+capital_outlay_ed <- budget_exp_final %>%
+    filter(demand_desc == "EDUCATION" & year == "2018-19" &
+             major_desc == "CAPITAL OUTLAY  ON EDUCATION S") %>%
+    group_by(soe_description) %>%
+    summarise(sanction = sum(sanction), revised = sum(revised))
+
+# Rename fields
+names(capital_outlay_ed) <- c("SOE", "Sanction", "Revised")
+
+# Print formatted table
+formattable(capital_outlay_ed, 
+            list(
+              Sanction = color_tile("coral", "tomato"),
+              Revised = color_tile("lightgreen", "seagreen")                   
+            )
+)
+```
+
+* Capital Outlay on Education was highest for University and Higher Education (54%) and lowest for Elelmentary Education (13%)
+* Over 99% of all Capital Outlay state expenditure was towards Major Works statement of expenditure.
+
+```{r public-works}
+# Public Works
+budget_exp_final %>%
+    filter(demand_desc == "EDUCATION" & year == "2018-19" &
+             major_desc == "PUBLIC WORKS") %>%
+    group_by(sub_minor_desc) %>%
+    summarise(sanction = sum(sanction), revised = sum(revised)) %>%
+    gather(type, amount, -sub_minor_desc) %>%
+    mutate(type = as_factor(type)) %>%
+    ggplot(aes(x = sub_minor_desc, y = amount, fill = type, label = amount)) +
+        geom_bar(stat = "identity", position = "dodge") +
+        scale_x_discrete(label = function(x) stringr::str_trunc(x, 20)) +
+        scale_y_continuous(labels = comma) + 
+        geom_text(position = position_dodge(width = 0.8)) +
+        scale_fill_discrete(name = "Type", labels = c("Sanction", "Revised")) + 
+        labs(title = "Public Works spending in Education", x = "Sub-Minor", y = "Amount") +
+        theme_minimal() + coord_flip()
+```
+
+* The state expenditure under the Major Public Works, over 77% was towards - MAINTENANCE OF PRIMARY SCHOOL BUILDINGS. [S00N].
+
+##### **General Education**
+
+```{r gen-ed}
+# Sub-Major
+gen_ed_sub_major <- budget_exp_final %>%
+    filter(demand_desc == "EDUCATION" & year == "2018-19" &
+             major_desc == "GENERAL EDUCATION") %>%
+    group_by(sub_major_desc) %>%
+    summarise(sanction = sum(sanction), revised = sum(revised)) %>%
+    mutate(percent = formattable::percent(revised - sanction)/sanction) %>%
+    arrange(desc(revised))
+
+# Rename fields
+names(gen_ed_sub_major) <- c("Sub-Major", "Sanction", "Revised", "Percent")
+
+# Print formatted table
+formattable(gen_ed_sub_major, list(
+                                Sanction = color_tile("coral", "tomato"),
+                                Revised = color_tile("lightgreen", "seagreen"),
+                                Percent = color_tile("paleturquoise", "turquoise")
+                                )
+            )
+
+# Minor
+gen_ed_minor <- budget_exp_final %>%
+    filter(demand_desc == "EDUCATION" & year == "2018-19" &
+             major_desc == "GENERAL EDUCATION") %>%
+    group_by(minor_desc) %>%
+    summarise(sanction = sum(sanction), revised = sum(revised)) %>%
+    mutate(percent = formattable::percent(revised - sanction)/sanction) %>%
+    arrange(desc(revised))
+
+# Rename fields
+names(gen_ed_minor) <- c("Minor", "Sanction", "Revised", "Percent")
+
+# Print formatted table
+formattable(gen_ed_minor, list(
+                            Sanction = color_tile("coral", "tomato"),
+                            Revised = color_tile("lightgreen", "seagreen"),
+                            Percent = color_tile("paleturquoise", "turquoise")
+                            )
+            )
+```
+
+### **Session Info**
+
+```{r session}
+# Information about the machine and enviroment
+sessionInfo()
+```
