@@ -39,9 +39,27 @@ The assignment shared by CivicDataLab can be found [here](https://gitlab.civicda
 
 ### **Submission**
 
+### **V02**
+
+---
+
+Follow-up on initial assignment with a deep dive.
+* Specific issues under Education, analyse the account heads for budget expenditure and district spending trends
+* Identify some key fund flow issues and/or interesting data insights/stories
+
+#### **Contents**
+
+1. [CivicDataLab | Public Finance Researcher Assignment - 2](https://docs.google.com/presentation/d/1IUyCREZvqchcusFGbzyvi2kXhLzIoGgw17ywrebyjx4/edit?usp=sharing) - **WIP** Deep Dive findings presentation.
+2. [Data Dive Blog](https://github.com/TheDataAreClean/public-finance-researcher-assignment/blob/master/files/html/deep_dive_blog.html) - Final Analysis Report (w/o code)
+3. [Data Dive Report](https://github.com/TheDataAreClean/public-finance-researcher-assignment/blob/master/files/html/deep_dive_report.html) - Final Analysis Report (w code)
+
+### **V01**
+
+---
+
 Final Findings [Presentation](https://docs.google.com/presentation/d/17HV_MKCJfzeP8RKrPK-cFHwmTtSsxULCD_j7Dz21WrU/edit?usp=sharing) to better communicate not only the key findings, but also the analysis process and addtional ideas.
 
-### **Contents**
+#### **Contents**
 
 1. [CivicDataLab | Public Finance Researcher Assignment](https://docs.google.com/presentation/d/17HV_MKCJfzeP8RKrPK-cFHwmTtSsxULCD_j7Dz21WrU/edit?usp=sharing) - Final findings presentation.
 2. [Data Analysis Blog](https://github.com/TheDataAreClean/public-finance-researcher-assignment/blob/master/files/html/data_analysis_blog.html) - Final Analysis Report (w/o code)
