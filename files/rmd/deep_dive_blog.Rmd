@@ -1,7 +1,7 @@
 ---
 title: '**Deep Dive Blog**'
 author: "TheDataAreClean"
-date: "6th April, '20"
+date: "7th April, '20"
 output:
   html_document:
     highlight: tango
@@ -62,7 +62,7 @@ Analysis of Education Department entries in the budgetary datasets.
 
 FY 2018-19 state budget expenditure transactions.
 
-```{r overview, warning = FALSE}
+```{r overview-state, warning = FALSE}
 # Account Heads
 state_exp_ed_18_19 <- budget_exp_final %>%
     filter(demand_desc == "EDUCATION" & year == "2018-19") %>%
@@ -241,6 +241,8 @@ budget_exp_final %>%
 
 ##### **General Education**
 
+Observation of various Sub-Major and Minor account heads under education to understand trends.
+
 ```{r gen-ed}
 # Sub-Major
 gen_ed_sub_major <- budget_exp_final %>%
@@ -281,6 +283,268 @@ formattable(gen_ed_minor, list(
                             Percent = color_tile("paleturquoise", "turquoise")
                             )
             )
+```
+
+**Further Questions**
+
+---
+
+* Teacher Training as a share of Education under different levels.
+* Composition of spending under Sarav Sikhsha Abhyan.
+* Spending on assistance to non govt. educational organisations.
+
+#### **District Spending**
+
+FY 2018-19 district spending expenditure transactions.
+
+```{r overview-dist, warning = FALSE}
+# Account Heads
+district_spend_ed_account_18_19 <- district_spending_exp_final %>%
+    filter(demand_desc == "EDUCATION" & year == "2018-19") %>%
+    group_by(major_desc, sub_major_desc) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    arrange(desc(net_payment))
+
+# Rename Fields
+names(district_spend_ed_account_18_19) <- c("Major", "Sub Major", "Net Payment")
+
+# Print formatted table
+formattable(district_spend_ed_account_18_19, 
+            list(
+                `Net Payment` = color_tile("coral", "tomato")
+                )
+            )
+```
+
+```{r overview-dist-2, warning = FALSE}
+# Account Heads
+district_spending_exp_final %>%
+    filter(demand_desc == "EDUCATION" & year == "2018-19") %>%
+    group_by(district) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    arrange(desc(net_payment)) %>%
+    mutate(district = as_factor(district)) %>%
+    ggplot(aes(x = district, y = net_payment, label = net_payment)) +
+        geom_bar(stat = "identity") + scale_y_continuous(labels = comma) +
+        geom_label(size = 3, hjust = 0.2) +
+        labs(title = "District Wise Education Spending", x = "", y = "Amount") +
+        theme_minimal() + theme(axis.text.x = element_text(angle = 65, vjust = 1, hjust = 1))
+        
+```
+
+Findings
+
+---
+
+* There is no district level spending under WELFARE OF SCHEDULED CASTES SC major head, confirming the findings in the state expenditure file.
+* Lahaul and Spiti do not have any education spending in 2018-19; even with some schools present in the area.
+
+##### **Welfare**
+
+```{r welfare-dist}
+# Social Security and Welfare
+welfare_dist_exp <- district_spending_exp_final %>%
+    filter(demand_desc == "EDUCATION" & year == "2018-19" &
+             major_desc == "SOCIAL SECURITY AND WELFARE") %>%
+    group_by(district, ddo_desc) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    arrange(desc(net_payment))
+
+# Rename Fields
+names(welfare_dist_exp) <- c("District", "DDO", "Net Payment")
+
+# Print formatted table
+formattable(welfare_dist_exp, 
+            list(
+                `Net Payment` = color_tile("coral", "tomato")
+                )
+            )
+```
+
+* Only 4 districts have Social Security and Welfare Spending, towards welfare of Handicapped Children.
+* All the spending is towards the SOE of salaries.
+* 5 DDOs from the 4 districts; which are Govt. Senior Secondary and Higher Secondary schools.
+
+##### **Language Development**
+
+```{r lang-dev-dist}
+# Language Development District/SOEs
+district_spending_exp_final %>%
+    filter(demand_desc == "EDUCATION" & year == "2018-19" &
+             sub_major_desc == "LANGUAGE DEVELOPMENT") %>%
+    group_by(district, soe_description) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    arrange(desc(net_payment)) %>%
+    ggplot(aes(x = district, y = net_payment, fill = soe_description)) +
+        geom_bar(stat = "identity", position = "stack") +
+        scale_y_continuous(labels = comma) +
+        labs(title = "Language Development Spending towards Sanskrit Pathshalas", 
+             x = "", y = "Net Payment") +
+        scale_fill_discrete(name = "SOE") + 
+        theme_minimal() + theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1))
+
+# Language Development
+lang_dev_dist <- district_spending_exp_final %>%
+    filter(demand_desc == "EDUCATION" & year == "2018-19" &
+             sub_major_desc == "LANGUAGE DEVELOPMENT") %>%
+    group_by(district, ddo_desc) %>%
+    summarise(net_payment = sum(net_payment))
+
+# Rename fields
+names(lang_dev_dist) <- c("District", "DDO", "Net Payment")
+
+# Print formatted table
+formattable(lang_dev_dist, 
+            list(
+                `Net Payment` = color_tile("coral", "tomato")
+                )
+            )
+```
+
+* 5 districts are spending towards Language Development (Sanskrit Pathshalas); mostly on Salaries.
+* Most DDOs are Sanskrit Colleges working in these district areas.
+
+##### **Art and Culture**
+
+```{r art-dist}
+# Art and culture spending over time
+district_spending_exp_final %>%
+    filter(demand_desc == "EDUCATION" & year == "2018-19" &
+             major_desc == "ART AND CULTURE") %>%
+    mutate(month = floor_date(transaction_date, unit = "month")) %>%
+    group_by(month) %>%
+    summarise(gross = sum(gross),
+              net_payment = sum(net_payment)) %>%
+    gather(type, amount, -month) %>%
+    ggplot(aes(x = month, y = amount, color = type)) +
+    geom_line() + geom_point() +
+    scale_y_continuous(labels = comma) +
+    scale_color_discrete(name = "Cylinders", labels = c("Gross", "Net Payment")) +
+    labs(title = "Art and Culture District Spending Over Time", x = "Time", y = "Amount") +
+    theme_minimal()
+
+# Art and culture district spending over time
+district_spending_exp_final %>%
+    filter(demand_desc == "EDUCATION" & year == "2018-19" &
+             major_desc == "ART AND CULTURE") %>%
+    mutate(month = floor_date(transaction_date, unit = "month")) %>%
+    group_by(month, district) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    ggplot(aes(x = month, y = net_payment, fill = district)) +
+    geom_area(stat = "identity", position = "stack") +
+        scale_y_continuous(labels = comma) +
+        labs(title = "Arts and Culture Spending by Districts", 
+             x = "", y = "Net Payment") +
+        scale_fill_discrete(name = "District") + 
+        theme_minimal()
+```
+
+* District level spending peaks in Jun, '18, Feb, '19 and Mar, '19
+* Large spikes in spending in Shimla (Jun, '18) and Harmirpur (Mar, '19)
+
+```{r art-dist-2}
+# Art and culture district spending by DDO
+art_ddo_dist_exp <- district_spending_exp_final %>%
+    filter(demand_desc == "EDUCATION" & year == "2018-19" &
+             major_desc == "ART AND CULTURE") %>%
+    group_by(district, ddo_desc) %>%
+    summarise(net_payment = sum(net_payment)) %>%
+    arrange(desc(net_payment)) %>%
+    head(10)
+
+# Rename fields
+names(art_ddo_dist_exp) <- c("District", "DDO", "Net Payment")
+
+# Print formatted table
+formattable(art_ddo_dist_exp, 
+            list(
+                `Net Payment` = color_tile("coral", "tomato")
+                )
+            )
+```
+
+CHIEF LIB.C.S.LIBRARY SOLAN	; DDO with the largest spending expenditure on Arts and Culture, followed by A.D.(EDU.) STATE LIBRARY SHIMLA.
+
+##### **Captial Outlay & Public Works**
+
+```{r capital-dist, eval = FALSE}
+# Capital Outlay
+budget_exp_final %>%
+    filter(demand_desc == "EDUCATION" & year == "2018-19" &
+             major_desc == "CAPITAL OUTLAY  ON EDUCATION S") %>%
+    group_by(minor_desc) %>%
+    summarise(sanction = sum(sanction), revised = sum(revised)) %>%
+    gather(type, amount, -minor_desc) %>%
+    mutate(type = as_factor(type)) %>%
+    ggplot(aes(x = minor_desc, y = amount, fill = type, label = amount)) +
+        geom_bar(stat = "identity", position = "dodge") +
+        scale_y_continuous(labels = comma) + geom_text(position = position_dodge(width = 0.8)) +
+        scale_fill_discrete(name = "Type", labels = c("Sanction", "Revised")) + 
+        labs(title = "Capital Outlay on Education", x = "Minor", y = "Amount") +
+        theme_minimal() + coord_flip()
+
+# SOE
+capital_outlay_ed <- budget_exp_final %>%
+    filter(demand_desc == "EDUCATION" & year == "2018-19" &
+             major_desc == "CAPITAL OUTLAY  ON EDUCATION S") %>%
+    group_by(soe_description) %>%
+    summarise(sanction = sum(sanction), revised = sum(revised))
+
+# Rename fields
+names(capital_outlay_ed) <- c("SOE", "Sanction", "Revised")
+
+# Print formatted table
+formattable(capital_outlay_ed, 
+            list(
+              Sanction = color_tile("coral", "tomato"),
+              Revised = color_tile("lightgreen", "seagreen")                   
+            )
+)
+```
+
+### **Extra**
+
+#### **Major Account Heads**
+
+Begins with | Accounts 
+--- | ---
+20 | Administration
+24/25/27 | Agricultural/Rural
+30 | Transportation/Tourism
+4 | Capital Outlay
+5 | Capital Outlay towards Transporation/Tourism
+6 | Debts and Loans
+7 | Loans to Govt. Servants
+
+#### **Education Account Heads**
+
+```{r ed-across, warning = FALSE}
+# Education Spending
+education_across <- budget_exp_final %>%
+    filter(year == "2018-19") %>%
+    filter(stringr::str_detect(demand_desc, pattern = "EDUC") | 
+           stringr::str_detect(major_desc, pattern = "EDUC")) %>%
+    group_by(demand, demand_desc, major, major_desc) %>%
+    summarise(sanction = sum(sanction), revised = sum(revised)) %>%
+    mutate(percent = (revised - sanction)/sanction) %>%
+    arrange(demand, major) %>%
+    select(demand, demand_desc, major, major_desc, sanction, revised, percent)
+    
+# Format % Field
+education_across$percent <- formattable::percent(education_across$percent)
+
+# Rename Fields
+names(education_across) <- c("Demand", "Demand Desc", "Major", "Major Desc", 
+                             "Sanction", "Revised", "Percent")
+
+# Print formatted table
+formattable(education_across,
+            list(
+              Sanction = color_tile("coral", "tomato"),
+              Revised = color_tile("lightgreen", "seagreen"),
+              Percent = color_tile("paleturquoise", "turquoise")
+              )
+)
 ```
 
 ### **Session Info**
