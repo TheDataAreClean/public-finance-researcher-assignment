@@ -49,9 +49,9 @@ Follow-up on initial assignment with a deep dive.
 
 #### **Contents**
 
-1. [CivicDataLab | Public Finance Researcher Assignment - 2](https://docs.google.com/presentation/d/1IUyCREZvqchcusFGbzyvi2kXhLzIoGgw17ywrebyjx4/edit?usp=sharing) - **WIP** Deep Dive findings presentation.
-2. [Data Dive Blog](https://github.com/TheDataAreClean/public-finance-researcher-assignment/blob/master/files/html/deep_dive_blog.html) - **WIP** Final Analysis Report (w/o code)
-3. [Data Dive Report](https://github.com/TheDataAreClean/public-finance-researcher-assignment/blob/master/files/html/deep_dive_report.html) - **WIP** Final Analysis Report (w/ code)
+1. [CivicDataLab | Public Finance Researcher Assignment - 2](https://docs.google.com/presentation/d/1IUyCREZvqchcusFGbzyvi2kXhLzIoGgw17ywrebyjx4/edit?usp=sharing) - Deep Dive findings presentation.
+2. [Data Dive Blog](https://github.com/TheDataAreClean/public-finance-researcher-assignment/blob/master/files/html/deep_dive_blog.html) - Final Analysis Report (w/o code)
+3. [Data Dive Report](https://github.com/TheDataAreClean/public-finance-researcher-assignment/blob/master/files/html/deep_dive_report.html) - Final Analysis Report (w/ code)
 
 ### **V01**
 
